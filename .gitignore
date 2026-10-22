@@ -14,3 +14,6 @@ logs/
 *.zip
 *.sql
 *.sqlite3
+
+# Claude Code (local)
+.claude/settings.local.json
