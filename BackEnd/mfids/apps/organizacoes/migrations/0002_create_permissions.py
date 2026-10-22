@@ -1,10 +1,10 @@
 from django.db import migrations
 from django.contrib.contenttypes.management import create_contenttypes
-from django.apps import apps
+from django.apps import apps as real_apps
 
 def create_contenttype_and_permissions(apps, schema_editor):
     # 1. Criar ContentTypes para todos os modelos não gerenciados
-    create_contenttypes(apps.get_app_config('organizacoes'))
+    create_contenttypes(real_apps.get_app_config('organizacoes'))
     
     # 2. Agora criar as permissões
     ContentType = apps.get_model('contenttypes', 'ContentType')
