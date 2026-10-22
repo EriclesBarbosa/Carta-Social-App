@@ -1,0 +1,16 @@
+# Segredos
+.env
+.env.*
+!env.sample
+# Dependências / builds
+node_modules/
+.next/
+mfids_env/
+__pycache__/
+*.pyc
+staticfiles/
+logs/
+# Dumps e arquivos
+*.zip
+*.sql
+*.sqlite3

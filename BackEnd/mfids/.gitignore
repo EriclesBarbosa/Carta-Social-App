@@ -1,0 +1,95 @@
+*.pyc
+*.DS_Store
+*.egg*
+/dist/
+/.idea
+/docs/_build/
+/node_modules/
+build/
+env
+env_linux
+
+# Database files - CRITICAL
+*.sqlite*
+db.sqlite3
+
+# Environment files - CRITICAL
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# Python virtual environment
+venv/
+venv_*/
+.venv/
+
+# Node modules and package locks
+node_modules/
+yarn.lock
+package-lock.json
+
+# Build and cache directories
+.cache/
+.webpack/
+static/dist/
+staticfiles/
+__pycache__/
+*.pyc
+*.pyo
+
+# Keep essential static files
+!static/images/
+!static/css/
+!static/js/
+!static/fonts/
+
+# Exception for essential logo files in dist/images
+!static/dist/images/01logo.png
+!static/dist/images/icon.jpg
+
+# Built files and bundles
+*.bundle.js
+*.bundle.js.map
+*.css.map
+output.css
+
+# Webpack stats
+webpack-stats.json
+
+# IDE and editor files
+.vscode/
+.vscode-server/
+*.log
+.idea/
+
+# Media uploads (except specific files)
+media/
+!/media/mapper.json
+!/media/Sales.csv
+# Ignore all uploaded files but keep sample files structure
+!/media/*/sample-*
+
+# Task logs and temporary files
+tasks_logs/
+*.tmp
+*.temp
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Application specific
+apps/common/management/
+apps/helpers/
+mfids.sock
+*.sock
+
+# Compiled translations
+locale/*/LC_MESSAGES/*.mo
+
+# Webpack stats
+webpack-stats.json
+
+web.config

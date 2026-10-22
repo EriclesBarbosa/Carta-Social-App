@@ -1,0 +1,502 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block content %}
+<main>
+  <div class="px-4 pt-6">
+    <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+      <!-- Main widget -->
+      <div class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm 2xl:col-span-2 dark:border-gray-700 sm:p-6 dark:bg-gray-800">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex-shrink-0">
+            <span class="text-xl font-bold leading-none text-gray-900 sm:text-2xl dark:text-white"></span>
+            <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Faixa Etária Atendida</h3>
+          </div>
+        </div>
+        <div id="equi-chart"></div>
+      </div>
+      
+      <!--Tabs widget -->
+      <div class="w-full  overflow-x-auto">
+        <div class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 md:col-span-2 lg:col-span-2">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex-shrink-0">
+        <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Valências</h3>
+        <span class="text-xl font-bold leading-none text-gray-900 sm:text-2xl dark:text-white">{{total_items_servico_ilha}}</span>
+      </div>
+    </div>
+    <div id="servico-chart" class="w-full h-64 md:h-72 lg:h-80"></div>
+  </div>
+
+        <div class="w-full overflow-x-auto pt-4">
+          <div class=" grid-cols-1 gap-4  items-center justify-between pt-6 p-4 bg-white border border-gray-200 rounded-lg shadow-sm sm:flex dark:border-gray-700 sm:p-6 dark:bg-gray-800">
+            <div class="w-full text-center">
+              <span class="text-2xl font-bold leading-none text-gray-900 sm:text-3xl dark:text-white">{{numero_total_funcionario.total}}</span>
+              <h3 class="text-base font-normal text-gray-500 dark:text-gray-400 mt-2">Número Total de Funcionários Ativos</h3>
+            </div>
+          </div>
+        </div>
+
+    </div>
+
+      
+    </div>
+
+    <!-- Seção com os dois painéis lado a lado -->
+    <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-2 mt-4">
+      <!-- Distribuição por Tipo de Resposta -->
+      <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Distribuição por Tipo de Resposta</h2>
+        <div class="mb-4">
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+            id="searchInputDtrs"
+            onkeyup="filterAndPaginateDtrs()"
+          />
+        </div>
+        <div class="w-full overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 table-fixed dark:divide-gray-600" id="tabela-dtrs">
+            <thead class="bg-gray-100 dark:bg-gray-700">
+              <tr>
+                <th scope="col" class="p-4"></th>
+                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                  Resposta social
+                </th>
+                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                  Percentagem
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700" id="tbody-dtrs">
+              {% for item in total_por_dtrs %}
+              <tr class="hover:bg-gray-100 dark:hover:bg-gray-700 group relative">
+                <td class="w-4 p-4"></td>
+                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ item.tipo_resposta_desc }}
+                </td>
+                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ item.percentagem }} %
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div id="pagination-dtrs" class="flex justify-center mt-4 gap-2 bg-white dark:bg-gray-800 p-2 rounded shadow-sm"></div>
+        </div>
+      </div>
+
+      <!-- Taxa de Ocupação -->
+      <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Taxa de Ocupação</h2>
+        <div class="mb-4">
+          <input
+            type="text"
+            placeholder="Pesquisar..."
+            class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+            id="searchInputTaxaOcupacao"
+            onkeyup="filterTableTaxaOcupacao()"
+          />
+        </div>
+        <div class="w-full overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200 table-fixed dark:divide-gray-600" id="tabela-taxa-ocupacao">
+            <thead class="bg-gray-100 dark:bg-gray-700">
+              <tr>
+                <th scope="col" class="p-4"></th>
+                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                  Equipamento
+                </th>
+                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                  Capacidade Instalada
+                </th>
+                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                  Percentagem
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700" id="tbody-taxa-ocupacao">
+              {% for item in taxa_ocupacao_equipamento %}
+              <tr class="hover:bg-gray-100 dark:hover:bg-gray-700 group relative">
+                <td class="w-4 p-4"></td>
+                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ item.nome_equipamento }}
+                </td>
+                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ item.capacidade_instalada }}
+                </td>
+                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                  {{ item.percentagem }} %
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div id="pagination-taxa-ocupacao" class="flex justify-center mt-4 gap-2 bg-white dark:bg-gray-800 p-2 rounded shadow-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.js"></script>
+
+<script>
+  const getAgeGroupChartOptions = () => {
+    let chartColors = {};
+
+    if (document.documentElement.classList.contains('dark')) {
+      chartColors = {
+        borderColor: '#374151',
+        labelColor: '#9CA3AF',
+        opacityFrom: 0,
+        opacityTo: 0.15,
+      };
+    } else {
+      chartColors = {
+        borderColor: '#F3F4F6',
+        labelColor: '#6B7280',
+        opacityFrom: 0.45,
+        opacityTo: 0,
+      };
+    }
+
+    const dataSeries = [
+      {% for item in total_por_faixa %}
+        { x: "{{ item.faixa_etaria|escapejs }}", y: {{ item.percentagem|stringformat:"f" }} }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    const yValues = dataSeries.map(item => item.y);
+    const yAxisMax = Math.ceil(Math.max(...yValues) / 10) * 10;
+
+    return {
+      chart: {
+        type: 'bar',
+        height: 400,
+        fontFamily: 'Inter, sans-serif',
+        foreColor: chartColors.labelColor,
+        toolbar: { show: false }
+      },
+      series: [{
+        name: 'Faixa Etária',
+        data: dataSeries,
+        color: '#1A56DB'
+      }],
+      plotOptions: {
+        bar: {
+          borderRadius: 4,
+          columnWidth: '60%',
+          dataLabels: {
+            position: 'top',
+          },
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: function(val) {
+          return val > 0 ? val.toFixed(2) + '%' : '';
+        },
+        offsetY: -20,
+        style: {
+          fontSize: '10px',
+          colors: [chartColors.labelColor],
+          fontWeight: 'bold'
+        }
+      },
+      xaxis: {
+        type: 'category',
+        labels: {
+          rotate: -45,
+          style: {
+            fontSize: '10px',
+            colors: chartColors.labelColor
+          }
+        },
+        axisBorder: { color: chartColors.borderColor },
+        axisTicks: { color: chartColors.borderColor }
+      },
+      yaxis: {
+        min: 0,
+        max: yAxisMax,
+        tickAmount: 5,
+        labels: {
+          style: {
+            colors: chartColors.labelColor,
+            fontSize: '11px'
+          },
+          formatter: function(val) {
+            return val + '%';
+          }
+        },
+        title: {
+          text: 'Percentagem',
+          style: {
+            color: chartColors.labelColor
+          }
+        }
+      },
+      tooltip: {
+        x: {
+          formatter: function(val) {
+            return val;
+          }
+        },
+        y: {
+          formatter: function(val) {
+            return val.toFixed(2) + '%';
+          }
+        }
+      },
+      legend: {
+        show: true,
+        position: 'top',
+        labels: {
+          colors: chartColors.labelColor,
+          useSeriesColors: false
+        }
+      },
+      grid: {
+        borderColor: chartColors.borderColor,
+        strokeDashArray: 2
+      },
+      responsive: [{
+        breakpoint: 768,
+        options: {
+          plotOptions: { bar: { columnWidth: '70%' } },
+          dataLabels: {
+            style: {
+              fontSize: '8px'
+            }
+          }
+        }
+      }]
+    };
+  };
+
+  if (document.getElementById('equi-chart')) {
+    const chart = new ApexCharts(
+      document.getElementById('equi-chart'),
+      getAgeGroupChartOptions()
+    );
+    chart.render();
+
+    document.addEventListener('dark-mode', () => {
+      chart.updateOptions(getAgeGroupChartOptions());
+    });
+  }
+</script>
+
+<!-- TABELA: taxa_ocupacao -->
+<script>
+  (function () {
+    const rowsPerPage = 10;
+    let currentPage = 1;
+    let allRows = [];
+    let filteredRows = [];
+
+    function init(tableId, tbodyId, paginationId) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+
+      allRows = Array.from(tbody.querySelectorAll("tr"));
+      filteredRows = [...allRows];
+      render(tbody, filteredRows, paginationId);
+    }
+
+    function filter(inputId, tableId, paginationId) {
+      const input = document.getElementById(inputId);
+      const filter = input.value.toLowerCase();
+      const table = document.getElementById(tableId);
+      const tbody = table.querySelector("tbody");
+
+      if (!table || !tbody) return;
+
+      filteredRows = allRows.filter((row) => {
+        const cell = row.cells[1];
+        return cell && cell.textContent.toLowerCase().includes(filter);
+      });
+
+      currentPage = 1;
+      render(tbody, filteredRows, paginationId);
+    }
+
+    function render(tbody, rows, paginationId) {
+      const totalPages = Math.ceil(rows.length / rowsPerPage);
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+
+      tbody.innerHTML = "";
+      rows.slice(start, end).forEach((row) => tbody.appendChild(row));
+
+      renderPagination(paginationId, totalPages);
+    }
+
+    function renderPagination(paginationId, totalPages) {
+      const container = document.getElementById(paginationId);
+      container.innerHTML = "";
+
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.className = `px-3 py-1 min-w-[36px] text-center font-semibold rounded-md border transition-all duration-150 
+          ${
+            i === currentPage
+              ? "bg-blue-600 text-gray-700  border-blue-600 shadow dark:bg-blue-500 dark:border-blue-500"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
+          }`;
+
+        btn.onclick = () => {
+          currentPage = i;
+          const tbody = document.getElementById("tbody-taxa-ocupacao");
+          render(tbody, filteredRows, paginationId);
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    // Inicializar ao carregar
+    document.addEventListener("DOMContentLoaded", () => {
+      init("tabela-taxa-ocupacao", "tbody-taxa-ocupacao", "pagination-taxa-ocupacao");
+    });
+
+    // Disponibilizar função de filtro no escopo global
+    window.filterTableTaxaOcupacao = () =>
+      filter("searchInputTaxaOcupacao", "tabela-taxa-ocupacao", "pagination-taxa-ocupacao");
+  })();
+</script>
+
+<!-- TABELA: DTRs -->
+<script>
+  (function () {
+    const rowsPerPage = 10;
+    let currentPage = 1;
+    let allRows = [];
+    let filteredRows = [];
+
+    function init(tableId, tbodyId, paginationId) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+
+      allRows = Array.from(tbody.querySelectorAll("tr"));
+      filteredRows = [...allRows];
+      render(tbody, filteredRows, paginationId);
+    }
+
+    function filter(inputId, tableId, paginationId) {
+      const input = document.getElementById(inputId);
+      const filter = input.value.toLowerCase();
+      const table = document.getElementById(tableId);
+      const tbody = table.querySelector("tbody");
+
+      if (!table || !tbody) return;
+
+      filteredRows = allRows.filter((row) => {
+        const cell = row.cells[1];
+        return cell && cell.textContent.toLowerCase().includes(filter);
+      });
+
+      currentPage = 1;
+      render(tbody, filteredRows, paginationId);
+    }
+
+    function render(tbody, rows, paginationId) {
+      const totalPages = Math.ceil(rows.length / rowsPerPage);
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+
+      tbody.innerHTML = "";
+      rows.slice(start, end).forEach((row) => tbody.appendChild(row));
+
+      renderPagination(paginationId, totalPages);
+    }
+
+    function renderPagination(paginationId, totalPages) {
+      const container = document.getElementById(paginationId);
+      container.innerHTML = "";
+
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.className = `px-3 py-1 border rounded ${
+          i === currentPage
+              ? "bg-blue-600 text-gray-700  border-blue-600 shadow dark:bg-blue-500 dark:border-blue-500"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
+          }`;
+        btn.onclick = () => {
+          currentPage = i;
+          const tbody = document.getElementById("tbody-dtrs");
+          render(tbody, filteredRows, paginationId);
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    // Inicializar ao carregar
+    document.addEventListener("DOMContentLoaded", () => {
+      init("tabela-dtrs", "tbody-dtrs", "pagination-dtrs");
+    });
+
+    // Disponibilizar função de filtro no escopo global
+    window.filterAndPaginateDtrs = () =>
+      filter("searchInputDtrs", "tabela-dtrs", "pagination-dtrs");
+  })();
+</script>
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+	const isDark = document.documentElement.classList.contains('dark');
+    if (document.getElementById('servico-chart')) {
+      const options = {
+        series: [{
+          name: 'Quantidade',
+          data: {{ data_servico_ilha|safe }}
+        }],
+        chart: {
+          height: 300,
+          type: 'bar',
+          fontFamily: 'Inter, sans-serif',
+          foreColor: '#4B5563',
+          toolbar: { show: false }
+        },
+        plotOptions: {
+          bar: {
+            borderRadius: 6,
+            dataLabels: {
+              position: 'top'
+            },
+            columnWidth: '60%',
+          }
+        },
+        dataLabels: {
+          enabled: true,
+			position: 'center',  // <- mostra no meio da barra
+			style: {
+				fontSize: '12px',
+				colors: [isDark ? '#F3F4F6' : '#FFFFFF']
+          }
+        },
+        xaxis: {
+          categories: {{ labels_servico_ilha|safe }},
+          labels: {
+            style: {
+              fontSize: '12px',
+              colors: '#6B7280'
+            }
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tooltip: { enabled: true }
+        },
+        yaxis: { show: false },
+        grid: { show: false },
+        colors: ['#1A56DB']
+      };
+
+      const chart = new ApexCharts(document.querySelector("#servico-chart"), options);
+      chart.render();
+    }
+  });
+</script>
+
+{% endblock content %}

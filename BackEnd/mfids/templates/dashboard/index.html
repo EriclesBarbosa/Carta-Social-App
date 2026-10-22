@@ -1,0 +1,536 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+
+{% block content %}
+
+<main>
+  <div class="px-4 pt-6">
+    <div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+      <!-- Main widget -->
+      <div
+        class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm 2xl:col-span-2 dark:border-gray-700 sm:p-6 dark:bg-gray-800">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex-shrink-0">
+            <span class="text-xl font-bold leading-none text-gray-900 sm:text-2xl dark:text-white">{{soma_total_equi_por_semana}}</span>
+            <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Total de equipamento nesta semana</h3>
+          </div>
+          <!--div
+            class="flex items-center justify-end flex-1 text-base font-medium text-green-500 dark:text-green-400">
+            12.5%
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd"
+                d="M5.293 7.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.707a1 1 0 01-1.414 0z"
+                clip-rule="evenodd"></path>
+            </svg>
+          </div--->
+        </div>
+        <div id="equi-chart"></div>
+        <!-- Card Footer -->
+        <!--div
+          class="flex items-center justify-between pt-3 mt-4 border-t border-gray-200 sm:pt-6 dark:border-gray-700">
+          <div>
+            <button
+              class="inline-flex items-center p-2 text-sm font-medium text-center text-gray-500 rounded-lg hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+              type="button" data-dropdown-toggle="weekly-sales-dropdown">Last 7 days <svg class="w-4 h-4 ml-2"
+                fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg></button>
+           
+            <div
+              class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-700 dark:divide-gray-600"
+              id="weekly-sales-dropdown">
+              <div class="px-4 py-3" role="none">
+                <p class="text-sm font-medium text-gray-900 truncate dark:text-white" role="none">
+                  Sep 16, 2021 - Sep 22, 2021
+                </p>
+              </div>
+              <ul class="py-1" role="none">
+                <li>
+                  <a href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                    role="menuitem">Yesterday</a>
+                </li>
+                <li>
+                  <a href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                    role="menuitem">Today</a>
+                </li>
+                <li>
+                  <a href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                    role="menuitem">Last 7 days</a>
+                </li>
+                <li>
+                  <a href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                    role="menuitem">Last 30 days</a>
+                </li>
+                <li>
+                  <a href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                    role="menuitem">Last 90 days</a>
+                </li>
+              </ul>
+              <div class="py-1" role="none">
+                <a href="#"
+                  class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-white"
+                  role="menuitem">Custom...</a>
+              </div>
+            </div>
+          </div>
+          <div class="flex-shrink-0">
+            <a href="#"
+              class="inline-flex items-center p-2 text-xs font-medium uppercase rounded-lg text-primary-700 sm:text-sm hover:bg-gray-100 dark:text-primary-500 dark:hover:bg-gray-700">
+              Sales Report
+              <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </a>
+          </div>
+        </div-->
+      </div>
+      <!--Tabs widget -->
+      <div
+        class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800">
+        <h3 class="flex items-center mb-4 text-lg font-semibold text-gray-900 dark:text-white">Agentes Equipamento
+          <button data-popover-target="popover-description" data-popover-placement="bottom-end" type="button"><svg
+              class="w-4 h-4 ml-2 text-gray-400 hover:text-gray-500" aria-hidden="true" fill="currentColor"
+              viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z"
+                clip-rule="evenodd"></path>
+            </svg><span class="sr-only">Show information</span></button>
+        </h3>
+        <div data-popover id="popover-description" role="tooltip"
+          class="absolute z-10 invisible inline-block text-sm font-light text-gray-500 transition-opacity duration-300 bg-white border border-gray-200 rounded-lg shadow-sm opacity-0 w-72 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400">
+          <div class="p-3 space-y-2">
+            <h3 class="font-semibold text-gray-900 dark:text-white">Agente</h3>
+            <p>Top cinco agentes com mais equipamento criado. </p>
+            <!--a href="#"
+              class="flex items-center font-medium text-primary-600 dark:text-primary-500 dark:hover:text-primary-600 hover:text-primary-700">Read
+              more <svg class="w-4 h-4 ml-1" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20"
+                xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clip-rule="evenodd"></path>
+              </svg></a-->
+          </div>
+          <div data-popper-arrow></div>
+        </div>
+        <div class="sm:hidden">
+          <label for="tabs" class="sr-only">Select tab</label>
+          <select id="tabs"
+            class="bg-gray-50 border-0 border-b border-gray-200 text-gray-900 text-sm rounded-t-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500">
+            <option>Statistics</option>
+            <option>Services</option>
+            <option>FAQ</option>
+          </select>
+        </div>
+        <ul
+          class="hidden text-sm font-medium text-center text-gray-500 divide-x divide-gray-200 rounded-lg sm:flex dark:divide-gray-600 dark:text-gray-400"
+          id="fullWidthTab" data-tabs-toggle="#fullWidthTabContent" role="tablist">
+          <!--li class="w-full">
+            <button id="faq-tab" data-tabs-target="#faq" type="button" role="tab" aria-controls="faq"
+              aria-selected="true"
+              class="inline-block w-full p-4 rounded-tl-lg bg-gray-50 hover:bg-gray-100 focus:outline-none dark:bg-gray-700 dark:hover:bg-gray-600">Top
+              products</button>
+          </li-->
+          <li class="w-full">
+            <button id="about-tab" data-tabs-target="#about" type="button" role="tab" aria-controls="about"
+              aria-selected="false"
+              class="inline-block w-full p-4 rounded-tr-lg bg-gray-50 hover:bg-gray-100 focus:outline-none dark:bg-gray-700 dark:hover:bg-gray-600">Agentes/ Total equipamento</button>
+          </li>
+        </ul>
+        <div id="fullWidthTabContent" class="border-t border-gray-200 dark:border-gray-600">
+          
+          <div class="hidden pt-4" id="about" role="tabpanel" aria-labelledby="about-tab">
+            <ul role="list" class="divide-y divide-gray-200 dark:divide-gray-700">
+              
+              {% for agent in  dados_equipamento_agente  %}
+            
+                  <li class="py-3 sm:py-4">
+                    <div class="flex items-center space-x-4">
+                      <div class="flex-shrink-0">
+                        <img class="w-8 h-8 rounded-full"
+                          src="{% if agent.avatar_user != 'dist/img/default-user.png' %}media/{{ agent.avatar_user }}{% else %}/static/{{ agent.avatar_user }}{% endif %}"
+                          alt="{{agent.user_name}} image">
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-medium text-gray-900 truncate dark:text-white">
+                         {{agent.user_name}}
+                        </p>
+                        <p class="text-sm text-gray-500 truncate dark:text-gray-400">
+                           {{agent.email}}
+                        </p>
+                      </div>
+                      <div class="inline-flex items-center text-base font-semibold text-gray-900 dark:text-white">
+                        {{agent.total_equipamentos}}
+                      </div>
+                    </div>
+                  </li>
+               {% endfor %}
+               
+            </ul>
+          </div>
+        </div>
+        <!-- Card Footer -->
+       
+      </div>
+    </div>
+   <div class="grid w-full grid-cols-1 gap-4 mt-4 md:grid-cols-2 lg:grid-cols-3">
+  <!-- Card 1 - Equipamento -->
+  <div class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 md:col-span-1 lg:col-span-2">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex-shrink-0">
+        <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Equipamento</h3>
+        <span class="text-xl font-bold leading-none text-gray-900 sm:text-2xl dark:text-white">{{total_items}}</span>
+      </div>
+    </div>
+    <div id="equipamento-chart" class="w-full h-64 md:h-72 lg:h-80"></div>
+  </div>
+
+  <!-- Card 2 - Equipamento Concelho -->
+  <div class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 md:col-span-1 lg:col-span-1">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex-shrink-0">
+        <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Equipamento Concelho</h3>
+      </div>
+    </div>
+    <div id="equipamento-concelho-chart" class="w-full h-64 md:h-72"></div>
+  </div>
+
+  <!-- Card 3 - Valências -->
+  <div class="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:border-gray-700 sm:p-6 dark:bg-gray-800 md:col-span-2 lg:col-span-2">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex-shrink-0">
+        <h3 class="text-base font-light text-gray-500 dark:text-gray-400">Valências</h3>
+        <span class="text-xl font-bold leading-none text-gray-900 sm:text-2xl dark:text-white">{{total_items_servico_ilha}}</span>
+      </div>
+    </div>
+    <div id="servico-chart" class="w-full h-64 md:h-72 lg:h-80"></div>
+  </div>
+</div>
+</main>
+ <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.35.0/dist/apexcharts.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+	const isDark = document.documentElement.classList.contains('dark');
+    if (document.getElementById('equipamento-chart')) {
+      const options = {
+        series: [{
+          name: 'Quantidade',
+          data: {{ data_equi_ilha|safe }}
+        }],
+        chart: {
+          height: 300,
+          type: 'bar',
+          fontFamily: 'Inter, sans-serif',
+          foreColor: '#4B5563',
+          toolbar: { show: false }
+        },
+        plotOptions: {
+          bar: {
+            borderRadius: 6,
+            dataLabels: {
+              position: 'top'
+            },
+            columnWidth: '60%',
+          }
+        },
+        dataLabels: {
+          enabled: true,
+			position: 'center',  // <- mostra no meio da barra
+			style: {
+				fontSize: '12px',
+				colors: [isDark ? '#F3F4F6' : '#FFFFFF']
+          }
+        },
+        xaxis: {
+          categories: {{ labels_equi_ilha|safe }},
+          labels: {
+            style: {
+              fontSize: '12px',
+              colors: '#6B7280'
+            }
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tooltip: { enabled: true }
+        },
+        yaxis: { show: false },
+        grid: { show: false },
+        colors: ['#1A56DB']
+      };
+
+      const chart = new ApexCharts(document.querySelector("#equipamento-chart"), options);
+      chart.render();
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+	const isDark = document.documentElement.classList.contains('dark');
+    if (document.getElementById('equipamento-concelho-chart')) {
+      const options = {
+        series: [{
+          name: 'Quantidade',
+          data: {{ data_equi_consel|safe }}
+        }],
+        chart: {
+          height: 300,
+          type: 'bar',
+          fontFamily: 'Inter, sans-serif',
+          foreColor: '#4B5563',
+          toolbar: { show: false }
+        },
+        plotOptions: {
+          bar: {
+            borderRadius: 6,
+            dataLabels: {
+              position: 'top'
+            },
+            columnWidth: '60%',
+          }
+        },
+        dataLabels: {
+          enabled: true,
+			position: 'center',  // <- mostra no meio da barra
+			style: {
+				fontSize: '12px',
+				colors: [isDark ? '#F3F4F6' : '#FFFFFF']
+          }
+        },
+        xaxis: {
+          categories: {{ labels_equi_consel|safe }},
+          labels: {
+            style: {
+              fontSize: '12px',
+              colors: '#6B7280'
+            }
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tooltip: { enabled: true }
+        },
+        yaxis: { show: false },
+        grid: { show: false },
+        colors: ['#1A56DB']
+      };
+
+      const chart = new ApexCharts(document.querySelector("#equipamento-concelho-chart"), options);
+      chart.render();
+    }
+  });
+</script>
+
+
+
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+	const isDark = document.documentElement.classList.contains('dark');
+    if (document.getElementById('servico-chart')) {
+      const options = {
+        series: [{
+          name: 'Quantidade',
+          data: {{ data_servico_ilha|safe }}
+        }],
+        chart: {
+          height: 300,
+          type: 'bar',
+          fontFamily: 'Inter, sans-serif',
+          foreColor: '#4B5563',
+          toolbar: { show: false }
+        },
+        plotOptions: {
+          bar: {
+            borderRadius: 6,
+            dataLabels: {
+              position: 'top'
+            },
+            columnWidth: '60%',
+          }
+        },
+        dataLabels: {
+          enabled: true,
+			position: 'center',  // <- mostra no meio da barra
+			style: {
+				fontSize: '12px',
+				colors: [isDark ? '#F3F4F6' : '#FFFFFF']
+          }
+        },
+        xaxis: {
+          categories: {{ labels_servico_ilha|safe }},
+          labels: {
+            style: {
+              fontSize: '12px',
+              colors: '#6B7280'
+            }
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tooltip: { enabled: true }
+        },
+        yaxis: { show: false },
+        grid: { show: false },
+        colors: ['#1A56DB']
+      };
+
+      const chart = new ApexCharts(document.querySelector("#servico-chart"), options);
+      chart.render();
+    }
+  });
+</script>
+
+
+<script>
+  const getMainChartOptions = () => {
+	let mainChartColors = {}
+
+	if (document.documentElement.classList.contains('dark')) {
+		mainChartColors = {
+			borderColor: '#374151',
+			labelColor: '#9CA3AF',
+			opacityFrom: 0,
+			opacityTo: 0.15,
+		};
+	} else {
+		mainChartColors = {
+			borderColor: '#F3F4F6',
+			labelColor: '#6B7280',
+			opacityFrom: 0.45,
+			opacityTo: 0,
+		}
+	}
+
+	return {
+		chart: {
+			height: 420,
+			type: 'area',
+			fontFamily: 'Inter, sans-serif',
+			foreColor: mainChartColors.labelColor,
+			toolbar: {
+				show: false
+			}
+		},
+		fill: {
+			type: 'gradient',
+			gradient: {
+				enabled: true,
+				opacityFrom: mainChartColors.opacityFrom,
+				opacityTo: mainChartColors.opacityTo
+			}
+		},
+		dataLabels: {
+			enabled: false
+		},
+		tooltip: {
+			style: {
+				fontSize: '14px',
+				fontFamily: 'Inter, sans-serif',
+			},
+		},
+		grid: {
+			show: true,
+			borderColor: mainChartColors.borderColor,
+			strokeDashArray: 1,
+			padding: {
+				left: 35,
+				bottom: 15
+			}
+		},
+		series: [
+			{
+				name: 'Equipamento',
+				data: {{equi_por_dia|safe}},
+				color: '#1A56DB'
+			}
+			
+		],
+		markers: {
+			size: 5,
+			strokeColors: '#ffffff',
+			hover: {
+				size: undefined,
+				sizeOffset: 3
+			}
+		},
+		xaxis: {
+			categories: {{dia_semana|safe}},
+			labels: {
+				style: {
+					colors: [mainChartColors.labelColor],
+					fontSize: '14px',
+					fontWeight: 500,
+				},
+			},
+			axisBorder: {
+				color: mainChartColors.borderColor,
+			},
+			axisTicks: {
+				color: mainChartColors.borderColor,
+			},
+			crosshairs: {
+				show: true,
+				position: 'back',
+				stroke: {
+					color: mainChartColors.borderColor,
+					width: 1,
+					dashArray: 10,
+				},
+			},
+		},
+		yaxis: {
+			labels: {
+				style: {
+					colors: [mainChartColors.labelColor],
+					fontSize: '14px',
+					fontWeight: 500,
+				},
+				formatter: function (value) {
+					return  + value;
+				}
+			},
+		},
+		legend: {
+			fontSize: '14px',
+			fontWeight: 500,
+			fontFamily: 'Inter, sans-serif',
+			labels: {
+				colors: [mainChartColors.labelColor]
+			},
+			itemMargin: {
+				horizontal: 10
+			}
+		},
+		responsive: [
+			{
+				breakpoint: 1024,
+				options: {
+					xaxis: {
+						labels: {
+							show: false
+						}
+					}
+				}
+			}
+		]
+	};
+}
+
+
+if (document.getElementById('equi-chart')) {
+	const chart = new ApexCharts(document.getElementById('equi-chart'), getMainChartOptions());
+	chart.render();
+
+	// init again when toggling dark mode
+	document.addEventListener('dark-mode', function () {
+		chart.updateOptions(getMainChartOptions());
+	});
+}
+</script>
+{% endblock content %}

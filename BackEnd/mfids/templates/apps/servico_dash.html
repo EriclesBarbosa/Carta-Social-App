@@ -1,0 +1,605 @@
+
+{% extends "layouts/base.html" %}
+
+{% load static get_attribute %}
+
+{% comment %} {% block extrastyle %}
+
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.tailwindcss.min.css">
+
+{% endblock extrastyle %} {% endcomment %}
+
+{% block content %}
+
+
+<main class="p-4">
+  <div
+    class="p-4 bg-white block sm:flex items-center justify-between border-b border-gray-200 lg:mt-1.5 dark:bg-gray-800 dark:border-gray-700">
+    
+    <div class="w-full mb-1">
+     
+      <div class="mb-4">
+        <nav class="flex mb-5" aria-label="Breadcrumb">
+          
+          <ol class="inline-flex items-center space-x-1 text-sm font-medium md:space-x-2">
+            <li class="inline-flex items-center">
+              <a href="#"
+                class="inline-flex items-center text-gray-700 hover:text-primary-600 dark:text-gray-300 dark:hover:text-white">
+                <svg class="w-5 h-5 mr-2.5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z">
+                  </path>
+                </svg>
+                Valências
+              </a>
+            </li>
+            <li>
+              <div class="flex items-center">
+                <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clip-rule="evenodd"></path>
+                </svg>
+                <a href="#"
+                  class="ml-1 text-gray-700 hover:text-primary-600 md:ml-2 dark:text-gray-300 dark:hover:text-white">Dashboard</a>
+              </div>
+            </li>
+          
+          </ol>
+        </nav>
+        <h1 class="text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">
+          Total
+          <span class="inline-flex items-center justify-center w-1/2 px-2 py-2.5 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+           {{total_items}}
+          </span>
+        </h1>
+      </div>
+      <div class="items-center justify-between block sm:flex dark:divide-gray-700">
+        <div class="flex items-center mb-4 sm:mb-0">
+          <form class="sm:pr-3 flex itmes-center gap-2" id="search-form" method="GET">
+            <div>
+              <label for="product-search" class="sr-only">Procurar </label>
+              <div class="relative w-48 sm:w-64 xl:w-96">
+                <input type="text" name="search" id="product-search"
+                  class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                  placeholder="Procurar">
+              </div>
+            </div>
+            <div>
+              <button type="submit" class="inline-flex items-center justify-center w-1/2 px-3 py-2.5 text-sm font-medium text-center text-white rounded-lg bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
+                <svg class="w-5 h-5 text-white dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!--div class="flex items-center ml-auto space-x-2 sm:space-x-3">
+          <form action="" method="post">
+            <button id="dropdownCheckboxButton" data-dropdown-toggle="dropdownDefaultCheckbox" class="inline-flex items-center justify-center w-1/2 px-2 py-2.5 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-700" type="button">
+              Hide / Show Column
+              <svg class="w-2.5 h-2.5 ml-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>
+              </svg>
+            </button>
+
+            <div id="dropdownDefaultCheckbox" class="w-max z-10 hidden w-48 bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600">
+              <ul class="p-3 space-y-3 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownCheckboxButton">
+                {% for field_name in field_names %}
+                  <li>
+                    <div class="flex items-center">
+                      <input id="checkbox-item-{{ field_name.id }}" data-target="{{ field_name.key }}" {% if field_name.value %} checked {% endif %} type="checkbox" value="{{ field_name.key }}" name="key" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+                      <label for="checkbox-item-{{ field_name.id }}" class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">{{ field_name.key }}</label>
+                    </div>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </form>
+        </div-->
+          
+          
+        <div class="flex items-center ml-auto space-x-2 sm:space-x-3">
+          <form method="post" class="inline-flex items-center justify-center w-1/2 px-2 py-2 text-sm font-medium text-center text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+            {% csrf_token %}
+
+            <select onchange="getPageItems(this)" id="items" class="bg-transparent dark:text-white py-0 border-transparent focus:border-transparent focus:ring-0">
+              <option class="dark:bg-gray-800" {% if items == 10 %} selected {% endif %} value="10">10 Itens</option>
+              <option class="dark:bg-gray-800" {% if items == 25 %} selected {% endif %} value="25">25 Itens</option>
+              <option class="dark:bg-gray-800" {% if items == 50 %} selected {% endif %} value="50">50 Itens</option>
+              <option class="dark:bg-gray-800" {% if items == 100 %} selected {% endif %} value="100">100 Itens</option>
+            </select>
+             
+          </form>
+          {% if request.user.is_authenticated %}
+          <!--button type="button" data-drawer-target="sales-create-modal"
+          data-drawer-show="sales-create-modal" aria-controls="sales-create-modal"
+          data-drawer-placement="right" class="inline-flex items-center justify-center w-1/2 px-3 py-2 text-sm font-medium text-center text-white rounded-lg bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
+              <svg class="w-5 h-5 mr-2 -ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+              Add
+          </button-->
+          {% endif %}
+          <div class="flex">
+            <a data-modal-target="export-csv-modal" data-modal-toggle="export-csv-modal">
+              <img class="w-10" src="{% static "dist/images/csv.png" %}" alt="">
+            </a>
+            {% comment %} <a data-modal-target="export-pdf" data-modal-toggle="export-pdf">
+              <img class="w-10" src="{% static "dist/images/pdf.png" %}" alt="">
+            </a> {% endcomment %}
+          </div>
+        </div> 
+      
+      </div>
+
+      <div class="items-end mt-4 justify-between block flex ">
+        <div class="flex items-center sm:mb-0">
+          <form action="{% url "servico:create_filter" %}" class="sm:pr-3 w-3/12" method="POST">
+            {% csrf_token %}
+            <div class="flex items-center gap-5">
+              <div>
+                <h1 style="white-space: nowrap;" class="block mb-2 dark:text-white">Filtros</h1>
+              </div>
+              <div>
+                <button id="addButton" type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Adicionar</button>
+              </div>
+            </div>
+
+
+
+            <div id="inputContainer">
+              {% if filter_instance %}
+                
+                {% for filter_data in filter_instance %}
+
+                
+                <div class="input-container flex align-center gap-5 mb-5">
+                  <div class="flex">
+                    <select name="key" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-l-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                      {% for field_name, verbose_name in db_field_names_tp   %}
+                        <option {% if filter_data.key == field_name %}selected{% endif %} value="{{ field_name }}">{{ verbose_name }}</option>
+                      {% endfor %}
+                    </select>
+                    <input name="value" value="{{ filter_data.value }}" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-r-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" type="text" placeholder="Introduza o valor">
+                  </div>
+                  <a href="{% url "servico:delete_filter" filter_data.id %}" class="remove-button focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2  dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900">X</a>
+                </div>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <button id="submitButton" type="submit" {% if not filter_instance %} style="display: none;" {% endif %} class="bg-green-500 text-white px-4 py-2 rounded-md mt-4">Enviar</button>
+          </form>
+        </div>
+
+        <div></div>
+        
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-col">
+    <div class="overflow-x-auto">
+      <div class="inline-block min-w-full align-middle">
+        <div class="overflow-hidden shadow">
+          <table class="min-w-full divide-y divide-gray-200 table-fixed dark:divide-gray-600">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                                <th scope="col" class="p-4">
+                                    <!--div class="flex items-center">
+                                        <input id="checkbox-all" aria-describedby="checkbox-1" type="checkbox"
+                                            class="w-4 h-4 border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:focus:ring-primary-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600">
+                                        <label for="checkbox-all" class="sr-only">checkbox</label>
+                                    </div-->
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Tipo de Resposta Social
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Nome Equipamento
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Data Licenciamento
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Capacidade Instalada
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Data Inicio do Funcionamento
+                                </th>
+                                <th scope="col" class="p-4 text-xs font-medium text-left text-gray-500 uppercase dark:text-gray-400">
+                                    Numero de funcionários
+                                </th>
+                           
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                            {% for servico in page_obj %}
+                            <tr class="hover:bg-gray-100 dark:hover:bg-gray-700 group relative">
+                                <td class="w-4 p-4">
+                                    <!--div class="flex items-center">
+                                        <input id="checkbox-{{ equipamento.id_equi }}" aria-describedby="checkbox-1" type="checkbox"
+                                            class="w-4 h-4 border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:focus:ring-primary-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600">
+                                        <label for="checkbox-{{ equipamento.id_equi }}" class="sr-only">checkbox</label>
+                                    </div-->
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.servico_nome }}
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.equipamento_nome }}
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.data_licenciamento }}
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.capacidade_instalada }}
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.data_inicio_funcionamento }}
+                                </td>
+                                <td class="p-4 text-base font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                    {{ servico.nr_funcionario }}
+                                </td>
+                         
+                                
+                           
+                                    <td class="p-4 space-x-2 whitespace-nowrap absolute inset-x-2/4 bottom-[-8px] hidden group-hover:block">
+                                        <div class="flex items-center gap-3">
+                                            <button type="button" id="viewServicoButton" data-drawer-target="view-servico-{{ servico.id }}"
+                                                data-drawer-show="view-servico-{{ servico.id }}" aria-controls="view-servico-{{ servico.id }}"
+                                                data-drawer-placement="right"
+                                                 title="Ver detalhes"
+                                                class="inline-flex items-center px-3 py-2 text-sm font-medium text-center text-white rounded-lg bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-primary-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-primary-800">
+                                                <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+                                                    <path stroke="currentColor" stroke-width="2" d="M21 12c0 1.2-4.03 6-9 6s-9-4.8-9-6c0-1.2 4.03-6 9-6s9 4.8 9 6Z"/>
+                                                    <path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+                                                </svg> 
+                                            </button>
+
+                                        </div>
+                                    </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <nav aria-label="Page navigation example" class="mt-5 ml-4">
+    <ul class="inline-flex -space-x-px text-base h-10">
+      {% if page_obj.has_previous %}
+        <li>
+          <a href="#" data-page="1" class="page-link flex items-center justify-center px-4 h-10 ml-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">First</a>
+        </li>
+        <li>
+          <a href="#" data-page="{{ page_obj.previous_page_number }}" class="page-link flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Prev</a>
+        </li>
+      {% endif %}
+
+      {% for n in page_obj.paginator.page_range %}
+        {% if page_obj.number == n %}
+          <li>
+            <span class="flex items-center justify-center px-4 h-10 text-blue-600 border border-gray-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-700 dark:text-white">{{ n }}<span class="sr-only"></span></span>
+          </li>
+        {% elif n > page_obj.number|add:'-3' and n < page_obj.number|add:'3' %}
+          <li>
+            <a class="page-link flex items-center justify-center px-4 h-10 leading-tight {% if page_obj.number == i %}text-blue-600 border border-gray-300 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 dark:border-gray-700 dark:bg-gray-700 dark:text-white{% else %}text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white{% endif %}" data-page="{{ n }}" href="#">
+              {{ n }}
+            </a>
+          </li>
+        {% endif %}
+      {% endfor %}
+      
+      {% if sales.has_next %}
+        <li>
+          <a href="#" data-page="{{ page_obj.next_page_number }}" class="page-link flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Next</a>
+        </li>
+        <li>
+          <a href="#" data-page="{{ page_obj.paginator.num_pages }}" class="page-link flex items-center justify-center px-4 h-10 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">Last</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+
+<!-- valenci Details Drawer -->
+  {% for servico in page_obj %}
+<div id="view-servico-{{ servico.id }}"
+  class="fixed top-0 right-0 z-40 w-full h-screen max-w-md p-4 overflow-y-auto transition-transform translate-x-full bg-white dark:bg-gray-800"
+  tabindex="-1" aria-labelledby="drawer-label" aria-hidden="true">
+  <div class="flex items-center justify-between mb-6">
+    <h5 id="drawer-label" class="text-xl font-semibold text-gray-900 dark:text-white">
+      Detalhes Valências
+    </h5>
+    <button type="button" data-drawer-dismiss="view-servico-{{ servico.id }}"
+      aria-controls="view-servico-{{ servico.id }}"
+      class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 inline-flex items-center dark:hover:bg-gray-600 dark:hover:text-white">
+      <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"
+        xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd"
+          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+          clip-rule="evenodd"></path>
+      </svg>
+      <span class="sr-only">Fechar</span>
+    </button>
+  </div>
+  
+  <div class="space-y-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {% for filed,verbose in db_field_names_tp %}
+      <div>
+        <label class="block mb-1 text-sm font-medium text-gray-500 dark:text-gray-400">{{ verbose }}</label>
+        <div class="p-3 text-base font-medium text-gray-900 bg-gray-50 rounded-lg dark:bg-gray-700 dark:text-white">
+          {{ servico|getattribute:filed|default:"-" }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="pt-4 mt-6 border-t border-gray-200 dark:border-gray-600">
+      <div class="flex justify-end space-x-3">
+        <button type="button" data-drawer-dismiss="view-servico-{{ servico.id }}"
+          class="px-5 py-2.5 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700 dark:focus:ring-gray-700">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+ {% endfor %}
+
+</main>
+
+  <!-- csv -->
+  <div id="export-csv-modal" tabindex="-1" aria-hidden="true" class="py-5 fixed top-0 left-0 right-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full">
+    <div class="relative w-full max-w-7xl max-h-full">
+        <!-- Modal content -->
+        <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+            <!-- Modal header -->
+            <div class="flex items-start justify-between p-4 border-b rounded-t dark:border-gray-600">
+                <div>
+                  <h3 class="text-xl font-semibold text-gray-900 dark:text-white">
+                    Export as Excel
+                  </h3>
+                </div>
+                <div class="text-xl font-semibold text-gray-900 dark:text-white">
+                  {% if request.GET.order_by or request.GET.search %}
+                    {% with order_by=request.GET.order_by search=request.GET.search %}
+                      <a href="{% url 'export_csv' %}?{% if order_by %}order_by={{ order_by }}{% endif %}{% if order_by and search %}&{% endif %}{% if search %}search={{ search }}{% endif %}">
+                        <img class="w-8" src="{% static 'dist/images/export.png' %}" alt="">
+                      </a>
+                    {% endwith %}
+                  {% else %}
+                    <a href="{% url 'servico:export_csv' %}">
+                      <img class="w-8" src="{% static 'dist/images/export.png' %}" alt="">
+                    </a>
+                  {% endif %}
+                </div>
+                <div>
+                  <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ml-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="export-csv-modal">
+                    <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                    </svg>
+                    <span class="sr-only">Close modal</span>
+                  </button>
+                </div>
+            </div>
+            <!-- Modal body -->
+            <div class="p-6 space-y-6">
+              <div class="flex flex-col">
+                <div class="overflow-x-auto">
+                  <div class="inline-block min-w-full align-middle">
+                    <div class="overflow-hidden shadow">
+                      {% include "includes/items-table.html" with items=sales %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  
+
+ 
+
+{% endblock content %}
+
+
+{% block extra_js %}
+
+
+
+<script>
+  document.getElementById('addButton').addEventListener('click', function() {
+    // Assumindo que db_field_names é uma lista de objetos com field_name e verbose_name
+    var dbFields = JSON.parse('{{ db_field_names_tem|safe|escapejs }}');
+    console.log(dbFields);
+    
+    // Gerar as opções do select corretamente
+    var selectOptions = dbFields.map((field) => 
+      `<option value="${field[0]}">${field[1]}</option>`
+    ).join('');
+
+    var template = `
+      <div class="input-container flex align-center gap-5 mb-5">
+        <div class="flex">
+          <select name="key" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-l-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+            ${selectOptions}
+          </select>
+          <input name="value" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-r-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" type="text" placeholder="Introduza o valor">
+        </div>
+        <button class="remove-button focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 mr-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900" onclick="removeInputContainer(this)">X</button>
+      </div>
+    `;
+
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = template;
+
+    document.getElementById('inputContainer').appendChild(tempDiv.firstElementChild);
+
+    document.getElementById('submitButton').style.display = 'inline-block';
+  });
+
+  function removeInputContainer(element) {
+    var inputContainer = element.closest('.input-container');
+    inputContainer.remove();
+    
+    var inputContainers = document.getElementsByClassName('input-container');
+    if (inputContainers.length === 0) {
+      document.getElementById('submitButton').style.display = 'none';
+    }
+  }
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var checkboxes = document.querySelectorAll('#dropdownDefaultCheckbox input[type="checkbox"]');
+    
+    checkboxes.forEach(function (checkbox) {
+
+      var targetColumnId = checkbox.getAttribute('data-target');
+      console.log(targetColumnId)
+      var targetColumn = document.getElementById('th_' + targetColumnId);
+      var exportTargetColumn = document.getElementById('th_' + targetColumnId + '_export');
+      var targetDataCells = document.querySelectorAll('.td_' + targetColumnId);
+
+      if (checkbox.checked) {
+        targetColumn.style.display = 'none';
+        exportTargetColumn.style.display = 'none';
+        targetDataCells.forEach(function (dataCell) {
+          dataCell.style.display = 'none';
+        });
+      }
+
+      checkbox.addEventListener('change', function () {
+        var targetColumnId = this.getAttribute('data-target');
+        var targetColumn = document.getElementById('th_' + targetColumnId);
+        var exportTargetColumn = document.getElementById('th_' + targetColumnId + '_export');
+        var targetDataCells = document.querySelectorAll('.td_' + targetColumnId);
+        
+        if (this.checked) {
+          targetColumn.style.display = 'none';
+          exportTargetColumn.style.display = 'none';
+          targetDataCells.forEach(function (dataCell) {
+            dataCell.style.display = 'none';
+          });
+        } else {
+          targetColumn.style.display = '';
+          exportTargetColumn.style.display = '';
+          targetDataCells.forEach(function (dataCell) {
+            dataCell.style.display = '';
+          });
+        }
+
+        fetch('/dash/servico/create-hide-show-items/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+          body: JSON.stringify({
+            key: targetColumnId,
+            value: this.checked
+          })
+        })
+
+      });
+    });
+  });
+</script>
+
+<script>
+  function getPageItems(selectObject) {
+    var value = selectObject.value;
+  
+    fetch('/dash/servico/create-page-items/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': '{{ csrf_token }}',
+      },
+      body: `items=${value}`
+    })
+    .then(response => {
+      location.reload()
+    })
+  }
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const paginationLinks = document.querySelectorAll('.page-link');
+    
+    paginationLinks.forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        const page = link.getAttribute('data-page');
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', page);
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      });
+    });
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const orderLinks = document.querySelectorAll('.order-link');
+
+    orderLinks.forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        const order_by = link.getAttribute('data-order');
+        const params = new URLSearchParams(window.location.search);
+        params.set('order_by', order_by);
+        const newUrl = window.location.href = `${window.location.pathname}?${params.toString()}`;
+        history.replaceState(null, null, newUrl);
+      });
+    }); 
+
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const searchForm = document.getElementById('search-form');
+    
+    searchForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const searchInput = document.getElementById('product-search');
+      const search = searchInput.value;
+      const params = new URLSearchParams(window.location.search);
+      params.set('search', search);
+      const newUrl = window.location.href = `${window.location.pathname}?${params.toString()}`;
+      history.replaceState(null, null, newUrl);
+    });
+  });
+
+</script>
+
+
+<script>
+
+
+
+// Função para fechar o modal
+function closeModal() {
+    document.getElementById('servicoModal').classList.add('hidden');
+}
+
+// Fechar modal ao clicar fora do conteúdo
+window.onclick = function(event) {
+    const modal = document.getElementById('servicoModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+</script>
+{% endblock extra_js %}

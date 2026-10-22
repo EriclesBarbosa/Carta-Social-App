@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Bem-vindo ao MFIDS</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f7;
+            color: #51545e;
+            margin: 0;
+            padding: 0;
+            -webkit-text-size-adjust: none;
+        }
+        .email-wrapper {
+            width: 100%;
+            background-color: #f4f4f7;
+            padding: 20px;
+        }
+        .email-content {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            padding: 20px;
+            border: 1px solid #eaeaef;
+            border-radius: 5px;
+        }
+        .email-header {
+            text-align: center;
+            padding: 10px 0;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #333333;
+        }
+        .email-header img {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        .email-body {
+            padding: 20px 0;
+        }
+        .email-body p {
+            font-size: 16px;
+            line-height: 1.5;
+            color: #51545e;
+        }
+        .credentials {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .email-footer {
+            text-align: center;
+            padding: 10px 0;
+            font-size: 14px;
+            color: #999999;
+        } 
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-content">
+            <div class="email-header">
+                <img src="https://embaixadadecaboverde.pt/documents/120558/0/armasCV.png/27f2ad11-258c-b7e0-2fd9-b11b6926d35e?t=1542373867722" alt="MFIDS Logo">
+                <h1>Bem-vindo(a) ao MFIDS</h1>
+            </div>
+            <div class="email-body">
+                <p>Prezado(a) {{ username }},</p>
+                <p>A sua conta foi criada com sucesso no sistema MFIDS. Seguem abaixo as suas credenciais de acesso:</p>
+                
+                <div class="credentials">
+                    <p><strong>Email:</strong> {{ email }}</p>
+                    <p><strong>Senha temporária:</strong> {{ password }}</p>
+                </div>
+
+                <p><strong>Importante:</strong> Por motivos de segurança, solicitamos que altere a sua senha após o primeiro acesso.</p>
+
+                <p class="section-title">Acessos disponíveis:</p>
+               
+
+                {% if type_login == 1 %}
+                 <p>O seu perfil de utilizador possui acesso aos seguintes ambientes da plataforma:</p>
+                    <ul>
+                        <li>
+                            <strong>Frontoffice (Portal Público):</strong><br>
+                            <a href="{{ login_url_front }}">{{ login_url_front }}</a>
+                        </li>
+                        <li>
+                            <strong>Backoffice (Gestão Administrativa):</strong><br>
+                            <a href="{{ login_url_back }}">{{ login_url_back }}</a>
+                        </li>
+                    </ul>
+                {% elif type_login == 2 %}
+                 <p>O seu perfil de utilizador possui acesso ao seguinte ambiente da plataforma:</p>
+                    <ul>
+                        <li>
+                            <strong>Backoffice (Gestão Administrativa):</strong><br>
+                            <a href="{{ login_url_back }}">{{ login_url_back }}</a>
+                        </li>
+                    </ul>
+                {% elif type_login == 3 %}
+                    <p>O seu perfil de utilizador possui acesso ao seguinte ambiente da plataforma:</p>
+                    <ul>
+                        <li>
+                            <strong>Frontoffice (Portal Público):</strong><br>
+                            <a href="{{ login_url_front }}">{{ login_url_front }}</a>
+                        </li>
+                    </ul>
+                {% endif %}
+               
+
+                <p>Caso não reconheça este registo, por favor ignore esta mensagem.</p>
+                <p>Em caso de dúvidas ou dificuldades no acesso, entre em contacto com a nossa equipa de suporte.</p>
+            </div>
+            <div class="email-footer">
+                <p>Atenciosamente,<br>Equipe de Suporte MFIDS</p>
+                <p>© 2025 MFIDS - Todos os direitos reservados</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

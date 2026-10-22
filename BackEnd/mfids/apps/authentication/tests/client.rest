@@ -1,0 +1,119 @@
+
+# Para usar instala  extension "REST Client"
+# Login
+POST http://127.0.0.1:8000/auth/login/
+Content-Type: application/json
+
+{"email":"patrickcardosodev@gmail.com","password":"ecolinux"}
+
+### 
+
+
+
+POST http://127.0.0.1:8000/auth/logout/
+Content-Type: application/json
+Authorization: Token ba80a8d7fca8b1c106ea228a7a52aa69a4013bed
+
+{}
+###
+  
+# register
+POST http://127.0.0.1:8000/auth/register/
+Content-Type: application/json
+Authorization: Token ba80a8d7fca8b1c106ea228a7a52aa69a4013bed
+
+{
+    "email": "patrickcardosodev@gmail.com",
+    "password": "ecolinux",
+    "password2": "ecolinux",
+    "is_client": true,
+    "is_worker": false
+}
+
+###
+
+
+# password reset
+POST http://127.0.0.1:8000/auth/password/reset/
+Content-Type: application/json
+
+{"email":"2017backend@gmail.com"}
+
+###
+
+### Password Reset Confirm
+
+POST http://127.0.0.1:8000/auth/password/reset/confirm/
+Content-Type: application/json
+
+{"email":"2017backend@gmail.com","password":"ecolinux1","code":"530369"}
+
+### change Password 
+
+POST http://127.0.0.1:8000/auth/change_password/
+Content-Type: application/json
+Authorization: Token 9fd44c65e71f308f3e50cef5fd6a36a22641e84e
+
+{"email":"2017backend@gmail.com","old_password":"ecolinux2","new_password":"ecolinux3"}
+
+###
+
+
+
+# get profile worker
+GET http://127.0.0.1:8000/auth/get_worker_profile/
+Content-Type: application/json
+Authorization: Token bf844d6f5a1619dbac7edfa789c77a9bdcfabcb8
+
+{}
+
+
+###
+
+# alter profile
+
+PUT http://127.0.0.1:8000/worker/create_alter_profile
+Content-Type: application/json
+Authorization: Token bf844d6f5a1619dbac7edfa789c77a9bdcfabcb8
+
+{
+  "user": 7,
+  "first_name": "Aleksey Patrick",
+  "last_name": "Cardoso",
+  "phone_number": "9100839",
+  "location_updated_at": "2024-08-21T12:17:55.422Z",
+  "is_available": true,
+  "rating": 0,
+  "vehicle_type": "Starlet",
+  "license_plate": "ST-81-FI"
+}
+
+
+###
+
+
+# alter profile campo especifico
+
+PATCH  http://127.0.0.1:8000/worker/create_alter_profile
+Content-Type: application/json
+Authorization: Token bf844d6f5a1619dbac7edfa789c77a9bdcfabcb8
+
+{"age": 31,  "residence": "Lima", "phone_number_1": "9255858", "phone_number_2":""}    
+
+
+# ------- Cliente-----
+
+### get profile client
+GET http://127.0.0.1:8000/worker/get_worker_profile
+Content-Type: application/json
+Authorization: Token bf844d6f5a1619dbac7edfa789c77a9bdcfabcb8
+
+{}
+
+
+PUT http://127.0.0.1:8000/auth/create_alter_client_profile/
+Content-Type: application/json
+Authorization: Token 9fd44c65e71f308f3e50cef5fd6a36a22641e84e
+
+{"name":"Patrick Manuel  Cardoso", "age": 31,  "residence": "Lima", "phone_number_1": "9255858", "phone_number_2":""}
+            
