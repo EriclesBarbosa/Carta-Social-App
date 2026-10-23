@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import {
   FormControl,
@@ -20,6 +20,8 @@ import {
 import { EquipmentFormValues } from "@/lib/schemas/equipament-schema";
 import { useEquipmentHooks } from "@/hooks/use-equipament";
 import dynamic from "next/dynamic";
+import { Button } from "@/components/ui/button";
+import { MapPin, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 
 const LocationPickerModal = dynamic(() => import("@/components/location-picker-modal").then(mod => mod.LocationPickerModal), {
   ssr: false,
@@ -29,7 +31,40 @@ interface ConstructionInfoFormProps {
   form: UseFormReturn<EquipmentFormValues>;
 }
 
+type GpsStatus = "idle" | "loading" | "success" | "error";
+
 export function ConstructionInfoForm({ form }: ConstructionInfoFormProps) {
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+
+  const captureGps = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus("error");
+      setGpsError("GPS não suportado neste browser.");
+      return;
+    }
+    setGpsStatus("loading");
+    setGpsError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        form.setValue("latitude", pos.coords.latitude.toFixed(6));
+        form.setValue("longitude", pos.coords.longitude.toFixed(6));
+        setGpsAccuracy(Math.round(pos.coords.accuracy));
+        setGpsStatus("success");
+      },
+      (err) => {
+        setGpsStatus("error");
+        setGpsError(
+          err.code === 1
+            ? "Permissão de localização negada. Activa o GPS nas definições do browser."
+            : "Não foi possível obter a localização. Tenta novamente."
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
   const {
     getBuildingTypeDomain,
     getPropertyRegimeDomain,
@@ -267,25 +302,68 @@ export function ConstructionInfoForm({ form }: ConstructionInfoFormProps) {
 
       
 
-      <div className="p-0 md:p-0 md:p-4 rounded-lg  mb-4">
-        <h3 className="font-medium mb-2">Coordenadas Geográficas </h3>
+      <div className="p-4 border rounded-lg bg-muted/30 mb-4">
+        <h3 className="font-medium mb-3">Coordenadas Geográficas</h3>
 
-        <LocationPickerModal
-          onLocationSelect={(lat, lng) => {
-            form.setValue("latitude", lat.toFixed(6));
-            form.setValue("longitude", lng.toFixed(6));
-          }}
-          defaultPosition={
-            !!form.getValues("latitude") && !!form.getValues("longitude")
-              ? {
-                  lat: parseFloat(form.getValues("latitude")?.toString() || "0"),
-                  lng: parseFloat(form.getValues("longitude")?.toString() || "0"),
-                }
-              : undefined
-          }
-        />
+        {/* Botão de toque único — ideal para uso no telemóvel em campo */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <Button
+            type="button"
+            onClick={captureGps}
+            disabled={gpsStatus === "loading"}
+            className="w-full sm:w-auto flex items-center gap-2 text-base h-12"
+          >
+            {gpsStatus === "loading" ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <MapPin className="h-5 w-5" />
+            )}
+            {gpsStatus === "loading" ? "A obter localização GPS..." : "Capturar GPS"}
+          </Button>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+          <LocationPickerModal
+            onLocationSelect={(lat, lng) => {
+              form.setValue("latitude", lat.toFixed(6));
+              form.setValue("longitude", lng.toFixed(6));
+              setGpsStatus("success");
+              setGpsAccuracy(null);
+            }}
+            defaultPosition={
+              !!form.getValues("latitude") && !!form.getValues("longitude")
+                ? {
+                    lat: parseFloat(form.getValues("latitude")?.toString() || "0"),
+                    lng: parseFloat(form.getValues("longitude")?.toString() || "0"),
+                  }
+                : undefined
+            }
+          />
+        </div>
+
+        {/* Feedback de estado do GPS */}
+        {gpsStatus === "success" && (
+          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2 mb-3">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>
+              Localização capturada
+              {gpsAccuracy !== null && (
+                <span className="ml-1 font-medium">
+                  — precisão ±{gpsAccuracy}m
+                  {gpsAccuracy <= 10 && " (Excelente)"}
+                  {gpsAccuracy > 10 && gpsAccuracy <= 30 && " (Boa)"}
+                  {gpsAccuracy > 30 && " (Regular — aguarda ou ajusta no mapa)"}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+        {gpsStatus === "error" && (
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2 mb-3">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{gpsError}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="latitude"
