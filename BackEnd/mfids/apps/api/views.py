@@ -624,13 +624,6 @@ class IlhaList(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = IlhaSerializer
 
-    # Define constant ilhas list at class level
-    ILHAS_CV = [
-        "BOA VISTA", "SAL", "SAO NICOLAU", 
-        "FOGO", "SAO VICENTE", "SANTIAGO", "MAIO", "BRAVA",
-        "SANTO ANTAO"
-    ]
-
     def get_queryset(self):
         try:
             profile = Profile.objects.get(user=self.request.user)
@@ -642,7 +635,7 @@ class IlhaList(generics.ListAPIView):
             return Geografia.objects.none()
 
         if municipio == 'all':
-            return Geografia.objects.filter(ilha__in=self.ILHAS_CV).values('ilha').distinct()
+            return Geografia.objects.values('ilha').distinct()
         else:
            
             ilha = Geografia.objects.filter(concelho=municipio).values('ilha').first()
@@ -712,13 +705,7 @@ class ProfileUpdateView(generics.RetrieveUpdateAPIView):
 class ConcelhosAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
-        ilhas = [
-            "BOA VISTA", "SAL", "SAO NICOLAU", "SANTIAGO NORTE", 
-            "FOGO", "SAO VICENTE", "SANTIAGO SUL", "MAIO", "BRAVA",
-            "SANTO ANTAO", "BOA VISTA"
-        ]
-        
-        concelhos = Geografia.objects.filter(ilha__in=ilhas)\
+        concelhos = Geografia.objects\
                    .order_by('concelho')\
                    .values_list('concelho', flat=True)\
                    .distinct()

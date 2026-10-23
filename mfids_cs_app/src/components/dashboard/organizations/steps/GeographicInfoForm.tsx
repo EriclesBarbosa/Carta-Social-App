@@ -177,7 +177,7 @@ export function GeographicInfoForm({
               <SelectContent>
                 {islands.data?.map((island: any) => (
                   <SelectItem
-                    key={`${island.ilha || island.nome}-${Math.random()}`}
+                    key={island.ilha || island.nome}
                     value={island.ilha || ""}
                   >
                     {island.ilha || island.nome}
@@ -218,7 +218,7 @@ export function GeographicInfoForm({
               <SelectContent>
                 {counties?.map((county: any) => (
                   <SelectItem
-                    key={`${county?.concelho || county?.nome}-${Math.random()}`}
+                    key={county?.concelho || county?.nome}
                     value={county?.concelho || ""}
                   >
                     {county?.concelho || county?.nome}
@@ -258,7 +258,7 @@ export function GeographicInfoForm({
               <SelectContent>
                 {parishes?.map((parish: any) => (
                   <SelectItem
-                    key={`${parish.freguesia || parish?.nome}-${Math.random()}`}
+                    key={parish.freguesia || parish?.nome}
                     value={parish.freguesia || ""}
                   >
                     {parish.freguesia || parish.nome}
@@ -296,7 +296,7 @@ export function GeographicInfoForm({
               </FormControl>
               <SelectContent>
                 {groupedZones.map((zone: any) => (
-                  <SelectItem key={zone.id} value={zone.zona}>
+                  <SelectItem key={zone.zona} value={zone.zona}>
                     {zone.zona}
                   </SelectItem>
                 ))}

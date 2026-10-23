@@ -235,6 +235,7 @@ print(User.objects.filter(username='$suEmail').exists())
     else {
         & $venvPy manage.py shell -c @"
 from django.contrib.auth.models import User, Permission
+from apps.users.models import Profile
 u = User.objects.create_superuser(username='$suEmail', email='$suEmail', password=r'$suPass')
 for codename in ('can_access_frontend', 'can_access_backoffice'):
     try:
@@ -242,6 +243,7 @@ for codename in ('can_access_frontend', 'can_access_backoffice'):
         u.user_permissions.add(p)
     except Permission.DoesNotExist:
         pass
+Profile.objects.update_or_create(user=u, defaults={'municipio': 'all'})
 "@ 2>&1 | Out-Null
         OK "Superutilizador '$suEmail' criado (com permissões de frontend/backoffice)"
     }

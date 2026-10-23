@@ -144,6 +144,76 @@ API_URL=http://localhost:8000
 - Tailwind is used in both the backend templates and the Next.js app, but they have separate configs (`BackEnd/mfids/tailwind.config.js` and `mfids_cs_app/tailwind.config.ts`)
 - shadcn/ui components are only in the Next.js app (`mfids_cs_app/components.json`)
 
+## Autorização — Perfis e Regras
+
+### Grupos Django (auth_group)
+
+| ID | Nome | Descrição |
+|----|------|-----------|
+| 1 | Agentes | Técnicos de campo — fazem levantamentos de equipamentos por município |
+| 2 | MFIDS | Gestão nacional — acesso idêntico ao DGIS |
+| 3 | Gestor de Equipamento | Gere equipamentos da sua organização gestora |
+| 4 | Proprietário do Equipamento | Gere a sua organização proprietária e os gestores associados |
+| 9 | DGIS | Administração nacional — acesso total |
+
+### Profile.municipio por grupo
+
+| Grupo | Valor |
+|-------|-------|
+| DGIS / MFIDS | `'all'` — vê todos os dropdowns geográficos |
+| Proprietário / Gestor | `'all'` — podem ter equipamentos em vários concelhos |
+| Agente | `concelho` da organização associada — filtro geográfico |
+
+O campo `Profile.municipio` afecta apenas os dropdowns de geografia (`IlhaList`, `ConcelhoList`). Quando é `None` ou vazio, esses endpoints devolvem lista vazia.
+
+### Matriz de autorização acordada
+
+#### Visibilidade
+
+| Recurso | DGIS | MFIDS | Agente | Proprietário | Gestor |
+|---------|------|-------|--------|--------------|--------|
+| Organizações | Todas | Todas | Só do seu município | Só a sua | Só a sua |
+| Equipamentos | Todos | Todos | Só do seu município | Só os da sua org | Só os da sua org |
+| Proprietários | Todos | Todos | Só do seu município | O próprio | O seu proprietário |
+| Gestores | Todos | Todos | Só do seu município | Só os seus | O próprio |
+| Utilizadores | Todos | Todos | — | — | — |
+| Geografia (dropdowns) | Todas as ilhas | Todas as ilhas | Só a sua ilha/concelho | Todas as ilhas | Todas as ilhas |
+
+#### Escrita
+
+| Acção | DGIS | MFIDS | Agente | Proprietário | Gestor |
+|-------|------|-------|--------|--------------|--------|
+| Criar organização | Sim | Sim | Sim (fazem levantamentos no terreno) | Não | Não |
+| Editar organização | Sim | Sim | Sim | Só a sua | Só a sua |
+| Criar equipamento | Sim | Sim | Sim | Sim (na sua org) | Sim (na sua org) |
+| Editar equipamento | Sim | Sim | Sim | Sim (na sua org) | Sim (na sua org) |
+| Apagar (qualquer) | Sim | Sim | Não | Não | Não |
+| Gerir utilizadores | Sim | Sim | Não | Não | Não |
+
+### Estado actual da implementação
+
+**Implementado e funcional:**
+- `can_create_organizacao` → Agentes, DGIS e MFIDS podem criar organizações
+- `can_edit_organizacao` → Agentes, DGIS e MFIDS podem editar organizações
+- `can_view_all_organizacao` → DGIS/MFIDS/Agentes vêem todas as organizações (DB confirma)
+- `can_view_only_my_organizacao` → Proprietário/Gestor vê só a sua org
+- `can_view_all_equipamento` → DGIS/MFIDS vê todos os equipamentos
+- `can_view_equipamento_create_by_user` → Agente vê equipamentos que criou
+- `view_associated_equipamentos` → Gestor/Proprietário vê equipamentos associados
+- Dropdowns geográficos filtrados por `Profile.municipio`
+
+**Pendente (melhoria futura):**
+- Visibilidade de organizações para Agentes: actualmente vêem todas; no futuro filtrar por município do agente
+
+**Atenção estrutural:**
+- As atribuições grupo → permissão estão **apenas na base de dados** (vieram do dump de produção). Não existem em migrations nem fixtures. Se a BD for recriada do zero, é necessário reatribuir as permissões manualmente via Django admin ou exportar um fixture com `python manage.py dumpdata auth.Group auth.Permission --indent 2 > fixtures/groups_permissions.json`.
+
+### Permissões relevantes (`apps/shared/permissions.py`)
+
+- `CanViewCreateUpdateOrganizacao` — guarda acesso a GET/POST/PATCH de organizações
+- `CanViewCreateUpdateEquipamento` — guarda acesso a GET/POST/PATCH de equipamentos
+- `get_user_permissions(user)` — helper que devolve dict de acções permitidas (usado no login para o frontend)
+
 ## Regras
 - Correções cirúrgicas; não reescrever ficheiros inteiros.
 - Respostas diretas, sem rodeios.

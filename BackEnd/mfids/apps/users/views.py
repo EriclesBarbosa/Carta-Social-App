@@ -309,10 +309,20 @@ def user_list(request):
             else:
                 is_staff = False
 
-            send_welcome_email(user,nome, password,is_staff,request)
+            try:
+                send_welcome_email(user, nome, password, is_staff, request)
+            except Exception:
+                pass
+
+            filters = user_filter_all(request)
+            user_list = User.objects.filter(filters)
+            page = request.GET.get('page', 1)
+            paginator = Paginator(user_list, 5)
+            users = paginator.page(page)
 
             form = SignupForm()
             context = {
+                'segment': 'users',
                 'users': users,
                 'form': form,
                 'messages': 'Utilizador criado com sucesso'
@@ -449,11 +459,17 @@ def user_organization_generate(request):
             if form.is_valid():
                 try:    
                     user, password = form.save()
-                
+
                     organizacao = UserOrganizacoes.objects.get(id=int(userOrg_id))
                     organizacao.user = user
                     organizacao.save()
-                    send_welcome_email(user, nome, password, is_staff, request)
+                    org = organizacao.organizacao
+                    if org.geografia and org.geografia.concelho:
+                        Profile.objects.filter(user=user).update(municipio=org.geografia.concelho)
+                    try:
+                        send_welcome_email(user, nome, password, is_staff, request)
+                    except Exception:
+                        pass
                     return redirect(request.META.get('HTTP_REFERER', '/'))
                 except Exception as e:
                     error = f"Erro ao processar o pedido: {str(e)}"

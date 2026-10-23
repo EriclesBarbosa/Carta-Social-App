@@ -21,5 +21,10 @@ class Migration(migrations.Migration):
         migrations.DeleteModel(
             name='GroupStatus',
         ),
-      
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.DeleteModel(name='User'),
+            ],
+            database_operations=[],
+        ),
     ]

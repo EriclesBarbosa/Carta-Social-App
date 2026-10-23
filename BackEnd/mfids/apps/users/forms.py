@@ -35,12 +35,6 @@ class SigninForm(AuthenticationForm):
 class SignupForm(forms.ModelForm):
     # Sobrescreva o campo is_superuser para usar um ChoiceField
 
-    ilhas = [
-            "BOA VISTA", "SAL", "SAO NICOLAU", "SANTIAGO NORTE", 
-            "FOGO", "SAO VICENTE", "SANTIAGO SUL", "MAIO", "BRAVA",
-            "SANTO ANTAO","BOA VISTA"
-        ]
-
     municipio = forms.ChoiceField(
         label="Município",
         choices=[],  
@@ -232,11 +226,6 @@ class UserPasswordChangeForm(PasswordChangeForm):
 
 class ProfileForm(forms.ModelForm):
 
-    ilhas = [
-            "BOA VISTA", "SAL", "SAO NICOLAU", "SANTIAGO NORTE", 
-            "FOGO", "SAO VICENTE", "SANTIAGO SUL", "MAIO", "BRAVA",
-            "SANTO ANTAO","BOA VISTA"
-        ]
     phone = forms.CharField(
         max_length=7,
         required=True,
@@ -284,7 +273,7 @@ class ProfileForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super(ProfileForm, self).__init__(*args, **kwargs)
 
-        concelhos = Geografia.objects.filter(ilha__in=self.ilhas)\
+        concelhos = Geografia.objects\
                .order_by('concelho')\
                .values_list('concelho', flat=True)\
                .distinct()

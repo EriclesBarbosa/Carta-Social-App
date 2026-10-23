@@ -2,7 +2,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.db.models import Q
 from datetime import datetime
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Permission
+from apps.users.models import Profile
 
 from rest_framework.exceptions import APIException
 from rest_framework import serializers
@@ -220,7 +221,18 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
                                                 ,last_name=' '.join(nome.split(' ')[1:]) if len(nome.split(' ')) > 1 else '' 
                                                 )
                 user.groups.set([4])
+                user.email = email
                 user.save()
+                try:
+                    perm = Permission.objects.get(codename='can_access_frontend')
+                    user.user_permissions.add(perm)
+                except Permission.DoesNotExist:
+                    pass
+                Profile.objects.filter(user=user).update(municipio='all')
+                try:
+                    send_welcome_email(user=user, nome=nome, password=password, is_staff=False, request=None)
+                except Exception:
+                    pass
 
             organizacao_p.tipo_organizacao = "P"
             organizacao_p.codigo_proprietario = username
@@ -248,7 +260,18 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
                                                 ,last_name=' '.join(nome.split(' ')[1:]) if len(nome.split(' ')) > 1 else '' 
                                                 )
                 user.groups.set([3])
+                user.email = email
                 user.save()
+                try:
+                    perm = Permission.objects.get(codename='can_access_frontend')
+                    user.user_permissions.add(perm)
+                except Permission.DoesNotExist:
+                    pass
+                Profile.objects.filter(user=user).update(municipio='all')
+                try:
+                    send_welcome_email(user=user, nome=nome, password=password, is_staff=False, request=None)
+                except Exception:
+                    pass
 
             organizacao_g.parent_id = organizacao_p.pk
             organizacao_g.tipo_organizacao = "G"
@@ -278,13 +301,24 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
                                                 
                                                 )
                 user.groups.set([4])
+                user.email = email
                 user.save()
+                try:
+                    perm = Permission.objects.get(codename='can_access_frontend')
+                    user.user_permissions.add(perm)
+                except Permission.DoesNotExist:
+                    pass
+                Profile.objects.filter(user=user).update(municipio='all')
+                try:
+                    send_welcome_email(user=user, nome=nome, password=password, is_staff=False, request=None)
+                except Exception:
+                    pass
 
             organizacao_p.tipo_organizacao = "P"
             organizacao_p.codigo_proprietario = username
 
             organizacao_p.save()
-            
+
 
             if user is None:
                 UserOrganizacoes.objects.create( organizacao = organizacao_p, criado_por = self.context['request'].user )
@@ -307,8 +341,19 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
                                                 ,last_name=' '.join(nome.split(' ')[1:]) if len(nome.split(' ')) > 1 else '' 
                                                 )
                 user.groups.set([3])
+                user.email = email
                 user.save()
-            
+                try:
+                    perm = Permission.objects.get(codename='can_access_frontend')
+                    user.user_permissions.add(perm)
+                except Permission.DoesNotExist:
+                    pass
+                Profile.objects.filter(user=user).update(municipio='all')
+                try:
+                    send_welcome_email(user=user, nome=nome, password=password, is_staff=False, request=None)
+                except Exception:
+                    pass
+
             organizacao_g.tipo_organizacao = "G"
             organizacao_g.codigo_gestor = username
 
@@ -366,8 +411,19 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
                                                 ,last_name=' '.join(instance.nome.split(' ')[1:]) if len(instance.nome.split(' ')) > 1 else '' 
                                                 )
                 user.groups.set([3])
+                user.email = instance.contato.email if instance.contato else ''
                 user.save()
-            
+                try:
+                    perm = Permission.objects.get(codename='can_access_frontend')
+                    user.user_permissions.add(perm)
+                except Permission.DoesNotExist:
+                    pass
+                Profile.objects.filter(user=user).update(municipio='all')
+                try:
+                    send_welcome_email(user=user, nome=instance.nome, password=password, is_staff=False, request=None)
+                except Exception:
+                    pass
+
             organizacao_g.codigo_gestor = username
             organizacao_g.save()
 
