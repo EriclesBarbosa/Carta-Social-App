@@ -56,7 +56,7 @@ export function LoginForm() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="w-full max-w-md p-1 md:p-4">
         <div className="flex justify-center py-6">
-          <Image src={logoImage} alt="Logo" width={300} height={300} style={{ height: "auto" }} priority />
+          <Image src={logoImage} alt="Logo" width={300} height={300} style={{ width: "300px", height: "auto" }} priority />
         </div>
         
         <Card className="border-0 shadow-xl overflow-hidden">

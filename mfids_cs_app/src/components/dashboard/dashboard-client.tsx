@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -31,8 +31,11 @@ export default function DashboardClient() {
   const { data: managers, isLoading: isLoadingManagers } =
     orgHooks.getManagers();
 
-  const canViewOrganizations = authService.hasPermission("organizacao", "list");
-  const canViewEquipment = authService.hasPermission("equipamento", "list");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const canViewOrganizations = mounted && authService.hasPermission("organizacao", "list");
+  const canViewEquipment = mounted && authService.hasPermission("equipamento", "list");
 
 
   return (

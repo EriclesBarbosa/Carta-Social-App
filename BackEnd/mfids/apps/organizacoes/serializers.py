@@ -203,6 +203,14 @@ class OrganizacaoSerializer(serializers.ModelSerializer):
            
         """
 
+        if User.objects.filter(email=email).exists():
+            raise CustomResponse(
+                detail=f"Este email {email} já se encontra registado no sistema.",
+                status_code=400,
+                operation_status="0",
+                operation_type="Validation Error"
+            )
+
         contato = Contato.objects.create(**contato_data) if contato_data else None
 
         if tipo_organizacao == "PG":

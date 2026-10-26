@@ -1,6 +1,6 @@
 "use client";
 
-import React, { ReactNode, useState } from "react";
+import React, { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -55,7 +55,13 @@ interface NavItem {
 
 export function ClientLayout({ children, title, className }: ClientLayoutProps) {
   const { isMobile } = useMediaQuery();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(isMobile ? false : true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setIsSidebarOpen(!isMobile);
+  }, [isMobile]);
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, hasUserType, idOrganizacao } = useAuth();
@@ -147,10 +153,10 @@ export function ClientLayout({ children, title, className }: ClientLayoutProps) 
     }
   ];
 
-  const filteredNavItems = navItems.filter(item => {
+  const filteredNavItems = mounted ? navItems.filter(item => {
     if (!item.permission) return true;
     return authService.hasPermission(item.permission.module, item.permission.action);
-  });
+  }) : [];
 
   return (
     <TooltipProvider>
@@ -159,7 +165,7 @@ export function ClientLayout({ children, title, className }: ClientLayoutProps) 
           className={cn(
             "bg-white shadow-lg transition-all duration-300 ease-in-out fixed h-full z-10",
             isSidebarOpen ? "w-64" : "w-20",
-            isMobile && !isSidebarOpen && "hidden" 
+            mounted && isMobile && !isSidebarOpen && "hidden"
           )}
         >
           <div className="flex flex-col h-full">
@@ -169,7 +175,7 @@ export function ClientLayout({ children, title, className }: ClientLayoutProps) 
             )}>
               {isSidebarOpen && (
                 <div className="flex-shrink-0">
-                  <Image src={imageLog} alt="Logo" width={200} height={70} className="object-contain" />
+                  <Image src={imageLog} alt="Logo" width={200} height={200} style={{ width: "200px", height: "auto" }} className="object-contain" priority />
                 </div>
               )}
               <Tooltip>
@@ -260,13 +266,13 @@ export function ClientLayout({ children, title, className }: ClientLayoutProps) 
           className={cn(
             "flex-1 flex flex-col transition-all duration-300 ease-in-out",
             isSidebarOpen ? "md:ml-64" : "md:ml-20",
-            !isMobile && "ml-0",               
-            isMobile && isSidebarOpen && "ml-0"
+            mounted && !isMobile && "ml-0",
+            mounted && isMobile && isSidebarOpen && "ml-0"
           )}
         >
           <header className="bg-white p-4 border-b border-gray-100 shadow-sm flex justify-between items-center sticky top-0 z-20">
             <div className="flex items-center">
-              {isMobile && (
+              {mounted && isMobile && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 

@@ -21,14 +21,16 @@ const BACKEND = [
   "http://localhost:8000",
 ].join(" ");
 
+const isDev = process.env.NODE_ENV === "development";
+
 // Content-Security-Policy blocks:
 //  • data: URI scripts  — attack vector used in the ClickFix incident
-//  • inline eval         — not needed by this app
+//  • inline eval         — blocked in production; allowed in dev for webpack source maps
 //  • external RPC calls to blockchain nodes — used by the malicious payload
 const CSP = [
-  // Scripts: only from same origin + Next.js inline chunks ('unsafe-inline' covers hydration).
-  // Explicitly NO 'data:' — this alone blocks the attack vector.
-  `script-src 'self' 'unsafe-inline'`,
+  // Scripts: only from same origin + Next.js inline chunks.
+  // 'unsafe-eval' is needed in dev for webpack eval-source-map; removed in production.
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
 
   // Styles: same origin + inline (Tailwind/Leaflet inject inline styles)
   `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,

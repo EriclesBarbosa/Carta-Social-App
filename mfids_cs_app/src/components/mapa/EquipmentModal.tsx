@@ -8,6 +8,7 @@ import { MapPin, Target, Map, Satellite } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import 'leaflet/dist/leaflet.css';
 
 const MAP_TYPES = {
   streets: {
@@ -53,6 +54,7 @@ const MapComponent = dynamic(
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
+    const leafletRef = useRef<any>(null);
     const [isMapReady, setIsMapReady] = useState(false);
     const [currentZoom, setCurrentZoom] = useState(8);
     const [mapType, setMapType] = useState<keyof typeof MAP_TYPES>("hybrid");
@@ -136,9 +138,9 @@ const MapComponent = dynamic(
     };
 
     const centerOnEquipments = () => {
-      if (!mapInstanceRef.current || validEquipments.length === 0) return;
+      if (!mapInstanceRef.current || !leafletRef.current || validEquipments.length === 0) return;
 
-      const L = window.L;
+      const L = leafletRef.current;
       const bounds = L.latLngBounds(
         validEquipments.map((eq) => [
           parseFloat(eq.latitude!.toString()),
@@ -150,9 +152,9 @@ const MapComponent = dynamic(
     };
 
     const updateTileLayer = () => {
-      if (!mapInstanceRef.current || typeof window === "undefined" || !window.L) return;
-      
-      const L = window.L;
+      if (!mapInstanceRef.current || !leafletRef.current) return;
+
+      const L = leafletRef.current;
       const map = mapInstanceRef.current;
       const selectedMapType = MAP_TYPES[mapType];
 
@@ -169,9 +171,9 @@ const MapComponent = dynamic(
     };
 
     const updateMarkers = () => {
-      if (!mapInstanceRef.current || typeof window === "undefined" || !window.L) return;
+      if (!mapInstanceRef.current || !leafletRef.current) return;
 
-      const L = window.L;
+      const L = leafletRef.current;
       const map = mapInstanceRef.current;
 
       markersRef.current.forEach((marker) => {
@@ -296,33 +298,8 @@ const MapComponent = dynamic(
 
       const initMap = async () => {
         try {
-          await new Promise((resolve) => {
-            if (typeof window !== "undefined" && (window as any).L) {
-              resolve((window as any).L);
-              return;
-            }
-
-            const script = document.createElement("script");
-            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            script.crossOrigin = "";
-            script.onload = () => resolve((window as any).L);
-            document.head.appendChild(script);
-
-            const link = document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-            link.crossOrigin = "";
-            document.head.appendChild(link);
-          });
-
-          const L = (window as any).L;
-
-          delete (L.Icon.Default.prototype as any)._getIconUrl;
-          L.Icon.Default.mergeOptions({
-            iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-            iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-          });
+          const L = (await import('leaflet')).default;
+          leafletRef.current = L;
 
           const map = L.map(mapRef.current!, {
             minZoom: 6,

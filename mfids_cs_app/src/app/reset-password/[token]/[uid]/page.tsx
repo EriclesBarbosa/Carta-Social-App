@@ -85,7 +85,7 @@ export default function PasswordResetConfirmPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="mb-8">
-          <Image src={'/logo-site.png'} alt="Logo" width={200} height={60} />
+          <Image src={'/logo-site.png'} alt="Logo" width={200} height={200} style={{ width: "200px", height: "auto" }} />
         </div>
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1">
@@ -119,7 +119,7 @@ export default function PasswordResetConfirmPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
       <div className="mb-8">
-        <Image src={'/logo-site.png'} alt="Logo" width={200} height={60} />
+        <Image src={'/logo-site.png'} alt="Logo" width={200} height={200} style={{ width: "200px", height: "auto" }} />
       </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
