@@ -2,6 +2,8 @@
 .env
 .env.*
 !env.sample
+SECRETS.md
+PERMISSOES.md
 # Dependências / builds
 node_modules/
 .next/

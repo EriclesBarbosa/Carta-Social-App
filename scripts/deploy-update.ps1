@@ -141,8 +141,13 @@ Start-Sleep -Seconds 8
 Log "────────────────────────────────────────────────────────"
 Log " Smoke test..."
 try {
-    $r = Invoke-WebRequest -Uri "http://localhost:8000/api/docs/" -UseBasicParsing -TimeoutSec 20
-    Log "✅ Backend responde: HTTP $($r.StatusCode)"
+    # /api/docs/ só existe em DEBUG=True; usar /api/login/ como health-check (devolve 405 em GET — servidor está vivo)
+    $r = Invoke-WebRequest -Uri "http://localhost:8000/api/login/" -UseBasicParsing -TimeoutSec 20 -ErrorAction SilentlyContinue
+    if ($r.StatusCode -in 200, 405) {
+        Log "✅ Backend responde: HTTP $($r.StatusCode)"
+    } else {
+        Abort "Backend devolveu HTTP $($r.StatusCode) inesperado"
+    }
 } catch {
     Abort "Backend não responde após reinicio: $($_.Exception.Message)"
 }
