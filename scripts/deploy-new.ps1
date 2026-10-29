@@ -182,10 +182,33 @@ Log "    Disco  : $freeGB GB livres em $drive"
 if ($DumpPath -and -not (Test-Path $DumpPath)) {
     Abort "DumpPath '$DumpPath' não existe."
 }
+
 if (-not $DumpPath) {
-    Log "⚠️  AVISO: dump não fornecido."
-    Log "   As tabelas 'geografia', 'dominio', grupos e permissões ficarão vazias."
-    Log "   O sistema arranca mas não é utilizável sem estes dados."
+    Write-Host ""
+    Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor Red
+    Write-Host "  ║  ATENÇÃO: DUMP DE BASE DE DADOS NÃO FORNECIDO           ║" -ForegroundColor Red
+    Write-Host "  ╠══════════════════════════════════════════════════════════╣" -ForegroundColor Red
+    Write-Host "  ║  Sem o dump, as seguintes tabelas ficam VAZIAS e o      ║" -ForegroundColor Red
+    Write-Host "  ║  sistema NÃO é utilizável após a instalação:            ║" -ForegroundColor Red
+    Write-Host "  ╠══════════════════════════════════════════════════════════╣" -ForegroundColor Yellow
+    Write-Host "  ║  Tabela               │ Impacto                         ║" -ForegroundColor Yellow
+    Write-Host "  ║  ─────────────────────┼─────────────────────────────── ║" -ForegroundColor Yellow
+    Write-Host "  ║  geografia            │ Dropdowns ilha/concelho vazios  ║" -ForegroundColor Yellow
+    Write-Host "  ║  dominio              │ Tipos de equipamento indispon.  ║" -ForegroundColor Yellow
+    Write-Host "  ║  auth_group           │ Nenhum utilizador faz login     ║" -ForegroundColor Yellow
+    Write-Host "  ║  auth_group_perms     │ Frontend bloqueia todos os users║" -ForegroundColor Yellow
+    Write-Host "  ╠══════════════════════════════════════════════════════════╣" -ForegroundColor Yellow
+    Write-Host "  ║  Solução: adicionar  -DumpPath 'C:\dumps\carta_social_  ║" -ForegroundColor Cyan
+    Write-Host "  ║           data_db.sql'  ao comando e voltar a correr.   ║" -ForegroundColor Cyan
+    Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor Red
+    Write-Host ""
+    $confirm = Read-Host "  Continuar sem dump? O sistema ficará inutilizável. (s/N)"
+    if ($confirm -ne 's' -and $confirm -ne 'S') {
+        Log "Instalação cancelada pelo utilizador — fornecer -DumpPath para sistema funcional."
+        Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
+        exit 0
+    }
+    Log "⚠️  Utilizador confirmou continuar sem dump — sistema ficará inutilizável até importar dados."
 }
 
 # ── FASE 1: Criar estrutura de pastas ─────────────────────────────────────────
@@ -213,6 +236,7 @@ if (-not (Test-Path $cfg.FrontDir)) {
 
 # ── FASE 3: Configurar base de dados PostgreSQL ───────────────────────────────
 Log "==> 3/9  A configurar base de dados PostgreSQL..."
+Log "    DB: $($cfg.DbName)  |  Utilizador: $($cfg.DbUser)"
 
 $env:PGPASSWORD = "postgres"   # password do superuser postgres (ajustar se necessário)
 
@@ -224,6 +248,11 @@ psql -U postgres -c $createDb   2>&1 | ForEach-Object { Log "    pg: $_" }
 
 if ($DumpPath) {
     Log "    A restaurar dump de produção (pode demorar alguns minutos)..."
+    Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
+    Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
+    Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
+    Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
+    Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
     $env:PGPASSWORD = $DbPassword
     psql -U $cfg.DbUser -d $cfg.DbName -f $DumpPath 2>&1 | ForEach-Object { Log "    pg: $_" }
     if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
@@ -334,32 +363,71 @@ if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
 # ── FASE 6: Verificar dados críticos ──────────────────────────────────────────
 Log "==> 6/9  A verificar dados críticos na base de dados..."
 
-$geoCount = & $cfg.Python -c "
-import django, os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','core.settings')
+$pyCheck = @"
+import django, os, sys
+os.environ.setdefault('DJANGO_SETTINGS_MODULE','core.settings')
 django.setup()
-from apps.organizacoes.models import Geografia
-print(Geografia.objects.count())
-" 2>$null
+from apps.organizacoes.models import Geografia, Dominio
+from django.contrib.auth.models import Group, Permission
+from django.db.models import Count
 
-$groupCount = & $cfg.Python -c "
-import django, os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','core.settings')
-django.setup()
-from django.contrib.auth.models import Group
-print(Group.objects.count())
-" 2>$null
+geo   = Geografia.objects.count()
+dom   = Dominio.objects.count()
+grp   = Group.objects.count()
+perms = Group.objects.annotate(n=Count('permissions')).filter(n__gt=0).count()
+print(f'{geo},{dom},{grp},{perms}')
+"@
 
-Log "    Registos em 'geografia' : $geoCount"
-Log "    Grupos em 'auth_group'  : $groupCount"
-
-if ([int]$geoCount -eq 0) {
-    Log "⚠️  AVISO: tabela 'geografia' vazia — dropdowns de ilha/concelho não vão funcionar."
-    Log "   Solução: restaurar o dump ou:"
-    Log "      psql -U $($cfg.DbUser) -d $($cfg.DbName) -f <dump>.sql"
+$result = & $cfg.Python -c $pyCheck 2>$null
+if ($result -match '^\d+,\d+,\d+,\d+$') {
+    $parts       = $result -split ','
+    $geoCount    = [int]$parts[0]
+    $domCount    = [int]$parts[1]
+    $groupCount  = [int]$parts[2]
+    $permsCount  = [int]$parts[3]
+} else {
+    $geoCount = $domCount = $groupCount = $permsCount = 0
+    Log "    ⚠️  Não foi possível consultar as tabelas — verificar erros acima."
 }
-if ([int]$groupCount -lt 5) {
-    Log "⚠️  AVISO: menos de 5 grupos — permissões podem estar incompletas."
-    Log "   Solução: restaurar o dump ou:"
-    Log "      $($cfg.Python) manage.py loaddata fixtures/groups_permissions.json"
+
+# Mostrar tabela de diagnóstico
+Write-Host ""
+Write-Host "  ┌──────────────────────────┬────────────┬─────────────────────────────────────┐" -ForegroundColor Cyan
+Write-Host "  │ Tabela                   │ Registos   │ Estado                              │" -ForegroundColor Cyan
+Write-Host "  ├──────────────────────────┼────────────┼─────────────────────────────────────┤" -ForegroundColor Cyan
+
+$geoStatus   = if ($geoCount   -gt 0)  { "✅ OK ($geoCount registos)" }   else { "❌ VAZIO — dropdowns ilha/concelho" }
+$domStatus   = if ($domCount   -gt 0)  { "✅ OK ($domCount registos)" }   else { "❌ VAZIO — tipos de equipamento/serviço" }
+$grpStatus   = if ($groupCount -ge 5)  { "✅ OK ($groupCount grupos)" }   else { "❌ INCOMPLETO — login impossível" }
+$permsStatus = if ($permsCount -ge 3)  { "✅ OK ($permsCount grupos c/ perms)" } else { "❌ SEM PERMISSÕES — frontend bloqueado" }
+
+$geoColor  = if ($geoCount   -gt 0) { "Green" } else { "Red" }
+$domColor  = if ($domCount   -gt 0) { "Green" } else { "Red" }
+$grpColor  = if ($groupCount -ge 5) { "Green" } else { "Red" }
+$permsColor= if ($permsCount -ge 3) { "Green" } else { "Red" }
+
+Write-Host ("  │ {0,-24}  │ {1,-10} │ {2,-35} │" -f "geografia", $geoCount, "") -NoNewline
+Write-Host $geoStatus -ForegroundColor $geoColor
+Write-Host ("  │ {0,-24}  │ {1,-10} │ {2,-35} │" -f "dominio", $domCount, "") -NoNewline
+Write-Host $domStatus -ForegroundColor $domColor
+Write-Host ("  │ {0,-24}  │ {1,-10} │ {2,-35} │" -f "auth_group", $groupCount, "") -NoNewline
+Write-Host $grpStatus -ForegroundColor $grpColor
+Write-Host ("  │ {0,-24}  │ {1,-10} │ {2,-35} │" -f "auth_group_permissions", $permsCount, "") -NoNewline
+Write-Host $permsStatus -ForegroundColor $permsColor
+Write-Host "  └──────────────────────────┴────────────┴─────────────────────────────────────┘" -ForegroundColor Cyan
+Write-Host ""
+
+Log "    geografia=$geoCount | dominio=$domCount | groups=$groupCount | groups_with_perms=$permsCount"
+
+$dadosCriticosEmFalta = ($geoCount -eq 0) -or ($domCount -eq 0) -or ($groupCount -lt 5) -or ($permsCount -lt 3)
+
+if ($dadosCriticosEmFalta) {
+    Write-Host "  ⚠️  DADOS CRÍTICOS EM FALTA — o sistema NÃO é utilizável no estado actual." -ForegroundColor Red
+    Write-Host "     Para restaurar, executar após a instalação:" -ForegroundColor Yellow
+    Write-Host "       psql -U $($cfg.DbUser) -d $($cfg.DbName) -f <dump>.sql" -ForegroundColor Yellow
+    Write-Host "       $($cfg.Python) manage.py migrate" -ForegroundColor Yellow
+    Write-Host ""
+    Log "⚠️  DADOS CRÍTICOS EM FALTA — sistema inutilizável sem importar o dump."
 }
 
 # ── FASE 7: Build do frontend Next.js ─────────────────────────────────────────
@@ -444,17 +512,30 @@ if (-not $smokeOK) {
 Log "════════════════════════════════════════════════════════"
 Log " ✅ Deploy de nova instalação concluído!"
 Log ""
+if ($dadosCriticosEmFalta) {
+    Log " ══ ⚠️  SISTEMA INUTILIZÁVEL — DADOS EM FALTA ══"
+    Log "  URGENTE — importar dump antes de qualquer outra coisa:"
+    Log "    1. psql -U $($cfg.DbUser) -d $($cfg.DbName) -f <dump>.sql"
+    Log "    2. $($cfg.Python) manage.py migrate"
+    Log "    3. Verificar (deve mostrar > 0 em todas as tabelas):"
+    Log "       $($cfg.Python) manage.py shell -c `"from apps.organizacoes.models import Geografia, Dominio; from django.contrib.auth.models import Group; print(f'geo={Geografia.objects.count()} dom={Dominio.objects.count()} groups={Group.objects.count()}')`""
+    Log ""
+}
 Log " PASSOS MANUAIS RESTANTES:"
-Log "  1. Preencher EMAIL_HOST_PASSWORD no ficheiro .env:"
-Log "     $envFile"
-Log "  2. Se o dump não foi restaurado, importar:"
-Log "     psql -U $($cfg.DbUser) -d $($cfg.DbName) -f <dump>.sql"
-Log "     $($cfg.Python) manage.py migrate"
-Log "  3. Criar superutilizador:"
+if (-not $emailPass -or -not (Get-Content $envFile -Raw | Select-String 'EMAIL_HOST_PASSWORD=.+')) {
+    Log "  1. ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
+    Log "     Preencher em: $envFile"
+    Log "     Gerar App Password em: Conta Google → Segurança → Passwords de aplicações"
+} else {
+    Log "  1. ✅ EMAIL_HOST_PASSWORD configurado"
+}
+Log "  2. Criar superutilizador Django:"
 Log "     $($cfg.Python) manage.py createsuperuser"
-Log "  4. Configurar IIS reverse proxy:"
-Log "     - Backend (gunicorn/wsgi): porta $($cfg.IIS_API_Port)"
-Log "     - Frontend (node server.js): porta $($cfg.IIS_App_Port)"
+Log "  3. Configurar IIS reverse proxy:"
+Log "     - Backend  → porta $($cfg.IIS_API_Port) → gunicorn ou httpPlatformHandler"
+Log "     - Frontend → porta $($cfg.IIS_App_Port) → node server.js (standalone)"
+Log "  4. ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS — editar em settings.py"
+Log "     BackEnd\mfids\core\settings.py (não são lidos do .env)"
 Log "  5. Instalar serviços Windows para Celery (ver docs\celery.md)"
 Log ""
 Log " Ambiente : $($Ambiente.ToUpper())"
