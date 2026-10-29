@@ -32,7 +32,7 @@ api.interceptors.response.use(
         Cookies.remove('mfids_token');
         localStorage.removeItem('user');
         
-        // window.location.href = '/login';
+        window.location.href = '/login';
       }
     }
     

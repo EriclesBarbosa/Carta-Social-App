@@ -11,6 +11,8 @@ const protectedRoutes = {
   '/dashboard/gestores': { module: 'organizacao', action: 'list' },
   '/dashboard/gestores/criar': { module: 'organizacao', action: 'create' },
   '/dashboard/gestores/editar': { module: 'organizacao', action: 'update' },
+  '/dashboard/mapa': { module: 'equipamento', action: 'list' },
+  '/dashboard/perfil': { module: 'equipamento', action: 'list' },
 };
 
 export function middleware(request: NextRequest) {

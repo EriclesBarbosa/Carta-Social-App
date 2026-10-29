@@ -95,7 +95,15 @@ class CanViewCreateUpdateEquipamento(permissions.BasePermission):
                 return True
 
             if request.user.has_perm("equipamentos.can_edit_equipamento_create_by_user"):
-                return True #return hasattr(obj, 'criado_por') and obj.criado_por == request.user
+                return hasattr(obj, 'criado_por') and obj.criado_por == request.user.pk
+
+            if request.user.has_perm("equipamentos.view_associated_equipamentos"):
+                from django.db.models import Q
+                from apps.equipamentos.models import EquipamentoOrganizacaoUtilizador
+                return EquipamentoOrganizacaoUtilizador.objects.filter(
+                    Q(users_pro=request.user.id) | Q(users_ges=request.user.id),
+                    id_equi=obj.pk
+                ).exists()
 
             return False
 
@@ -105,10 +113,6 @@ class CanViewCreateUpdateEquipamento(permissions.BasePermission):
 def get_user_permissions(user: User):
 
     all_permissions = user.get_all_permissions()
-    
-    print("Todas as permissões do usuário:")
-    for perm in sorted(all_permissions):
-        print(perm)
 
     permissions = {
         "organizacao": {

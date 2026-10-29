@@ -37,7 +37,12 @@ DEBUG = str2bool(os.environ.get('DEBUG'))
 #print(' DEBUG -> ' + str(DEBUG) ) 
 
 # Hosts Settings
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'backendcartasocial.dgis.gov.cv',
+    '84.247.171.243',
+    'localhost',
+    '127.0.0.1',
+]
 CSRF_TRUSTED_ORIGINS = ['http://localhost:8000','http://localhost:4000','http://backendcartasocial.dgis.gov.cv', 'http://localhost:3000', 'http://localhost:5085', 'http://127.0.0.1:8000', 'http://127.0.0.1:5085', 'https://rocket-django-pro.onrender.com']
 
 # Used by DEBUG-Toolbar 
@@ -136,8 +141,25 @@ CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "https://cartasocial.dgis.gov.c
 
 # Allow authentication credentials (cookies, sessions, tokens)
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_HEADERS = ["*"]
-CORS_ALLOW_METHODS = ["*"]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 
 SESSION_COOKIE_AGE = 30 * 60  
@@ -406,7 +428,7 @@ REST_FRAMEWORK = {
 ########################################
 
 # risky
-SESSION_COOKIE_HTTPONLY=False
+SESSION_COOKIE_HTTPONLY=True
 
 MESSAGE_TAGS = {
     messages.INFO: 'text-blue-800 border border-blue-300 bg-blue-50 dark:text-blue-400 dark:border-blue-800',

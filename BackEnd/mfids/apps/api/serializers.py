@@ -15,6 +15,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ['full_name', 'phone', 'municipio', 'country', 'city', 'zip_code', 'address', 'avatar']
+        read_only_fields = ['municipio']
 
 
 class SalesSerializer(serializers.ModelSerializer):

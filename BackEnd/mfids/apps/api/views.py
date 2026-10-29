@@ -131,9 +131,7 @@ class UserRegisterView(APIView):
             return Response({"error": "Username already taken"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(username=username, email=email, password=password)
-        token, _ = Token.objects.get_or_create(user=user)
-
-        return Response({"message": "User registered", "token": token.key}, status=status.HTTP_201_CREATED)
+        return Response({"message": "User registered"}, status=status.HTTP_201_CREATED)
 
 class UserLoginView(APIView):
     permission_classes = [AllowAny]
@@ -365,8 +363,7 @@ class ProprietarioListView(generics.ListAPIView):
             )
 
 class GestorListView(generics.ListAPIView):
-    #permission_classes = [IsAuthenticated,CanViewCreateUpdateOrganizacao]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateOrganizacao]
     #queryset = Organizacao.objects.filter(tipo_organizacao__in=['G', 'PG'])
     serializer_class = ListByTypeOrganizationSerializer
 
@@ -414,20 +411,27 @@ class GestorListView(generics.ListAPIView):
 
 
 class ProprietarioFreeListView(generics.ListAPIView):
-    #permission_classes = [IsAuthenticated,CanViewCreateUpdateOrganizacao]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateOrganizacao]
     queryset = Organizacao.objects.filter(tipo_organizacao__in=['P'], parent_id__isnull=True)
     serializer_class = OrganizacaoSerializerDetail
 
 class AddGestorToProprietarioView(generics.CreateAPIView):
-    #permission_classes = [IsAuthenticated,CanViewCreateUpdateOrganizacao]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateOrganizacao]
     queryset = Organizacao.objects.all()
     serializer_class = AddGestorToProprietarioSerializer
 
 
 class ValidarOrganizacaoView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        if not (request.user.has_perm("organizacoes.can_edit_all_organization") or
+                request.user.is_staff):
+            return Response(
+                {"operationStatus": 0, "operationType": "Error",
+                 "operationDesc": "Sem permissão para validar registos."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         serializer = ValidarOrganizacaoSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -520,8 +524,8 @@ class EquipamentoDetailView(generics.UpdateAPIView):
             )
 
 class EquipamentoGetDetailView(generics.RetrieveAPIView):
-    
-    permission_classes = [IsAuthenticated]
+
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateEquipamento]
     queryset = Equipamento.objects.all()
     serializer_class = EquipamentoDetailSerializer
 
@@ -545,13 +549,22 @@ class FonteFinanciamentoListView(generics.ListAPIView):
     serializer_class = FonteFinanciamentoSerializer
 
 class EquipamentoCreateView(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]  
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateEquipamento]
     queryset = Equipamento.objects.all()  
     serializer_class = EquipamentoSerializer 
 
 
 class ValidarEquipamentoView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        if not (request.user.has_perm("equipamentos.can_edit_all_equipamento") or
+                request.user.is_staff):
+            return Response(
+                {"operationStatus": 0, "operationType": "Error",
+                 "operationDesc": "Sem permissão para validar registos."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         serializer = ValidarEquipamentoSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -601,7 +614,7 @@ class ValidarEquipamentoView(APIView):
         
 # serviso
 class ServicoListCreateView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateEquipamento]
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
 
@@ -615,7 +628,7 @@ class ServicoListCreateView(generics.ListCreateAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 class ServicoDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanViewCreateUpdateEquipamento]
     queryset = Servico.objects.all()
     serializer_class = ServicoSerializer
 

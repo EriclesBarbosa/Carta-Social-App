@@ -22,9 +22,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 from django.views.static import serve 
 from django.views.generic import RedirectView
 
-def trigger_error(request):
-    division_by_zero = 1 / 0
-
 urlpatterns = [
     path("", include("home.urls")),
    # path("admin/hj853dfgygecodgfwe6564388/", admin.site.urls),
@@ -48,15 +45,11 @@ urlpatterns = [
     path('dash/equipamento/', include('apps.equipamentos.urls')),
     path('dash/servico/', include('apps.servicos.urls')),
     
-    path('api/docs/schema', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/'      , SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path("__debug__/", include("debug_toolbar.urls")),
 
-    path('sentry-debug/', trigger_error),
     path('i18n/', include('django.conf.urls.i18n')),
 
-    re_path(r'^media/(?P<path>.*)$', serve,{'document_root': settings.MEDIA_ROOT}), 
-    re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}), 
+    re_path(r'^static/(?P<path>.*)$', serve,{'document_root': settings.STATIC_ROOT}),
 
  
 
@@ -64,4 +57,8 @@ urlpatterns = [
 
 urlpatterns += static(settings.CELERY_LOGS_URL, document_root=settings.CELERY_LOGS_DIR)
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL      , document_root=settings.MEDIA_ROOT     )
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += [
+        path('api/docs/schema', SpectacularAPIView.as_view(), name='schema'),
+        path('api/docs/'      , SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    ]

@@ -91,10 +91,9 @@ class UserPasswordResetConfirmView(generics.GenericAPIView):
 
     def post(self, request, uidb64, token):
         # Primeiro valida o token
-        try: 
+        try:
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
-            print(user)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             user = None
 
@@ -138,6 +137,13 @@ class ChangePasswordView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ChangePassword
     def post(self, request):
+        if request.data.get('email') != request.user.email:
+            return Response({
+                "operationStatus": 0,
+                "operationType": "Error",
+                "operationDesc": "Não autorizado.",
+                "return_id": 0
+            }, status=status.HTTP_403_FORBIDDEN)
         serializer = ChangePassword(data=request.data)
         if serializer.is_valid():
             serializer.save()
