@@ -127,6 +127,104 @@ O `-DryRun` é a forma de validar o script antes de o correr a sério, sem preci
 > 2. Correr `-DryRun` e confirmar que todos os checks passam e os caminhos estão correctos
 > 3. Correr sem `-DryRun` para a instalação real
 
+#### Teste end-to-end com Hyper-V Quick Create
+
+O `-DryRun` verifica a lógica mas não executa nada. Para um teste **completo e real** — onde o script corre do início ao fim numa máquina virgem exactamente como em produção — usa o Hyper-V Quick Create. É gratuito e está incluído no Windows 11 Pro/Enterprise.
+
+**Pré-requisito:** Windows 11 Pro, Enterprise ou Education (o Windows 11 Home não inclui Hyper-V).
+
+**Passo 1 — Activar Hyper-V** (se ainda não estiver activo):
+
+```powershell
+# Executar como Administrador — requer reinício
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
+Restart-Computer
+```
+
+**Passo 2 — Criar a VM com Quick Create:**
+
+1. Abrir o **Hyper-V Manager** (pesquisar no menu Iniciar)
+2. No painel direito clicar em **"Quick Create…"**
+3. Seleccionar **Windows Server 2022** (ou Windows 11, se estiver disponível)
+4. Clicar em **"Create Virtual Machine"** — o download e criação demora ~10–20 minutos
+5. Clicar em **"Connect"** e depois **"Start"** para iniciar a VM
+6. Completar o assistente inicial do Windows (idioma, conta de Administrador local)
+
+> 💡 A VM criada pelo Quick Create tem acesso à internet por defeito via NAT. Não precisas de configurar rede manualmente.
+
+**Passo 3 — Copiar os ficheiros para a VM:**
+
+Na VM (ligada via Hyper-V Enhanced Session ou RDP):
+
+```powershell
+# Na VM — criar pasta para os ficheiros de instalação
+New-Item -ItemType Directory -Path "C:\deploy" -Force
+
+# No teu PC (fora da VM) — copiar o dump e o script via partilha de clipboard ou
+# arrastar e largar na janela da VM em modo Enhanced Session
+# Alternativa: usar um servidor de ficheiros partilhado ou pendrive virtual
+```
+
+Ou, mais simples, activar a **partilha de pasta** na VM:
+
+1. Na janela da VM → **View** → **Enhanced Session**
+2. Na caixa de diálogo de ligação → **"Show Options"** → tab **"Local Resources"**
+3. Em **"Local devices and resources"** → **"More…"** → marcar a **unidade C:** (ou a pasta onde tens o dump)
+4. A unidade fica acessível dentro da VM em `\\tsclient\C\`
+
+**Passo 4 — Instalar os pré-requisitos na VM** (secção 3.2):
+
+Na VM, abrir o PowerShell como Administrador e instalar manualmente:
+- Python 3.11+ (marcar "Add to PATH")
+- Node.js 20 LTS
+- PostgreSQL 16 (anotar a password do `postgres`)
+- Git
+- IIS com httpPlatformHandler e URL Rewrite
+
+```powershell
+# Activar IIS na VM
+Install-WindowsFeature -Name Web-Server, Web-Mgmt-Tools -IncludeManagementTools
+
+# Verificar instalações
+python --version   # Python 3.11.x
+node --version     # v20.x.x
+git --version      # git version 2.x.x
+psql --version     # psql (PostgreSQL) 16.x
+```
+
+**Passo 5 — Correr o deploy:**
+
+```powershell
+# Na VM — copiar a pasta scripts/ do repositório para C:\deploy\
+# (ou clonar o repositório directamente)
+
+# DryRun primeiro para confirmar que os pré-requisitos estão correctos
+.\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql" -DryRun
+
+# Se tudo OK, instalação real
+.\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql"
+```
+
+**Passo 6 — Verificar o resultado:**
+
+```powershell
+# Na VM — verificar que os serviços estão a correr
+Invoke-WebRequest -Uri "http://localhost:8000/api/login/" -UseBasicParsing
+Invoke-WebRequest -Uri "http://localhost:4000/"           -UseBasicParsing
+
+# Abrir o browser dentro da VM e aceder a http://localhost:4000
+```
+
+**Passo 7 — Limpeza após o teste:**
+
+Depois de validar, podes simplesmente apagar a VM inteira no Hyper-V Manager (botão direito → **Delete**). Não deixa rasto no teu sistema operativo principal.
+
+> ⚠️ **Diferenças entre a VM de teste e produção a ter em conta:**
+> - A VM usa `localhost`; em produção o domínio será `cartasocial.dgis.gov.cv`
+> - O certificado TLS (HTTPS) não está configurado na VM — testar apenas HTTP
+> - Os serviços Celery (NSSM) podem precisar de configuração manual adicional
+> - A password do `postgres` que definiste na VM é diferente da de produção
+
 #### Output esperado da configuração guiada (Fase 4)
 
 Quando o `.env` não existe, o script faz 4 perguntas interactivas:
@@ -2747,9 +2845,17 @@ Get-Service Redis, CeleryWorker, CeleryBeat, W3SVC | Select-Object Name, Status
 ## Resumo rápido
 
 ```
-TESTAR ANTES DE INSTALAR (sem máquina nova, sem tocar em nada):
-  .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql" -DryRun
-  <- verifica pré-requisitos, disco e dump; mostra tudo o que seria executado
+TESTAR ANTES DE INSTALAR:
+  Opção A — DryRun (sem máquina nova, sem tocar em nada):
+    .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql" -DryRun
+    <- verifica pré-requisitos, disco e dump; mostra tudo o que seria executado
+
+  Opção B — Hyper-V Quick Create (teste end-to-end completo numa VM):
+    1. Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All
+    2. Hyper-V Manager → Quick Create → Windows Server 2022
+    3. Instalar pré-requisitos na VM (secção 3.2 deste guia)
+    4. Correr deploy-new.ps1 dentro da VM com -DryRun e depois sem
+    (ver secção "Teste end-to-end com Hyper-V Quick Create" para guia completo)
 
 PRIMEIRA INSTALAÇÃO (servidor novo):
   .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
