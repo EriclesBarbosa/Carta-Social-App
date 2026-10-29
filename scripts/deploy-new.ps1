@@ -232,13 +232,47 @@ if ($DumpPath) {
 }
 
 # ── FASE 4: Configurar .env do backend ────────────────────────────────────────
-Log "==> 4/9  A verificar .env do backend..."
+Log "==> 4/9  A configurar .env do backend..."
 $envFile = "$($cfg.BackendDir)\.env"
 if (-not (Test-Path $envFile)) {
-    Log "    .env não encontrado — a criar..."
+    Log "    .env não encontrado — a iniciar configuração guiada..."
 
     # Gerar SECRET_KEY via Python stdlib (secrets module, criptograficamente seguro)
     $secretKey = python -c "import secrets, string; chars = string.ascii_letters + string.digits + '!@#%^&*(-_=+)'; print(''.join(secrets.choice(chars) for _ in range(50)))"
+
+    Write-Host ""
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "   Configuração de Secrets — responde às perguntas abaixo." -ForegroundColor Cyan
+    Write-Host "   Prima ENTER para deixar vazio (pode preencher depois no .env)." -ForegroundColor Gray
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+
+    # EMAIL_HOST_PASSWORD — necessário para reset de password
+    Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
+    Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
+    Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
+    $emailPass = Read-Host "        Valor"
+
+    # Domínio de produção — para referência (ALLOWED_HOSTS está em settings.py)
+    Write-Host ""
+    Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
+    Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
+    Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
+    $prodDomain = Read-Host "        Valor"
+
+    # CELERY_BROKER — Redis broker URL
+    Write-Host ""
+    Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
+    Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
+    $celeryBroker = Read-Host "        Valor"
+
+    # DSN_KEY — Sentry error tracking
+    Write-Host ""
+    Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
+    Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
+    $sentryDsn = Read-Host "        Valor"
+
+    Write-Host ""
 
     $envContent = @"
 DEBUG=False
@@ -249,10 +283,29 @@ DB_PORT=5432
 DB_NAME=$($cfg.DbName)
 DB_USERNAME=$($cfg.DbUser)
 DB_PASS=$DbPassword
-EMAIL_HOST_PASSWORD=
+EMAIL_HOST_PASSWORD=$emailPass
 "@
+
+    if ($celeryBroker) {
+        $envContent += "`nCELERY_BROKER=$celeryBroker"
+    }
+    if ($sentryDsn) {
+        $envContent += "`nDSN_KEY=$sentryDsn"
+    }
+
     Set-Content $envFile $envContent -Encoding UTF8
-    Log "    ✅ .env criado. Preenche EMAIL_HOST_PASSWORD antes de usar o sistema."
+    Log "    ✅ .env criado com as variáveis configuradas."
+
+    # Nota sobre ALLOWED_HOSTS se domínio foi fornecido
+    if ($prodDomain) {
+        Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
+        Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
+        Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
+    }
+    if (-not $emailPass) {
+        Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
+        Log "       Preencher depois em: $envFile"
+    }
 } else {
     Log "    .env já existe — mantido sem alterações."
 }
