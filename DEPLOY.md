@@ -1,6 +1,6 @@
 # Guia de Deploy — Carta Social (MFIDS/DGIS)
 
-> **Versão:** 2.0 · **Data:** 2026-10-23  
+> **Versão:** 4.0 · **Data:** 2026-10-29  
 > **Para quem é este guia?** Para qualquer pessoa da equipa técnica que precise instalar ou actualizar o sistema, mesmo sem experiência anterior com este servidor.
 
 ---
@@ -57,6 +57,46 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 | `scripts/rollback-db.ps1` | Reverter base de dados para um dump anterior |
 | `scripts/backup-db.ps1` | Backup manual ou agendar backup diário |
 | `scripts/health-check.ps1` | Verificar saúde dos serviços (ou agendar verificação automática) |
+
+### Flags do deploy-new.ps1
+
+| Flag | Quando usar |
+|------|-------------|
+| `-Ambiente staging` | Instalar o ambiente de staging em vez de produção |
+| `-AppRoot "D:\apps\cartasocial"` | Usar uma pasta raiz diferente do padrão |
+| `-DbPassword "Pass123!"` | **(Obrigatório)** Password para o utilizador PostgreSQL |
+| `-DumpPath "C:\dumps\carta_social_data_db.sql"` | Dump de BD com geografia, domínios e grupos/permissões |
+
+#### Output esperado da configuração guiada (Fase 4)
+
+Quando o `.env` não existe, o script faz 4 perguntas interactivas:
+
+```
+  ══════════════════════════════════════════════════════
+   Configuração de Secrets — responde às perguntas abaixo.
+   Prima ENTER para deixar vazio (pode preencher depois no .env).
+  ══════════════════════════════════════════════════════
+
+  [1/4] EMAIL_HOST_PASSWORD
+        App Password do Gmail (conta mfids.dgis@gmail.com).
+        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações
+        Valor: **********************
+
+  [2/4] DOMÍNIO DE PRODUÇÃO
+        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243
+        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)
+        Valor: cartasocial.dgis.gov.cv
+
+  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)
+        Ex: redis://localhost:6379
+        Valor: redis://localhost:6379
+
+  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)
+        Ex: https://abc123@o123456.ingest.sentry.io/789
+        Valor:
+```
+
+> ⚠️ O domínio de produção introduzido em **[2/4]** NÃO é escrito no `.env`. O script emite uma nota a lembrar de actualizar `ALLOWED_HOSTS` e `CORS_ALLOWED_ORIGINS` em `BackEnd/mfids/core/settings.py` (estão hardcoded, não são lidos do `.env`).
 
 ### Flags do deploy-update.ps1
 
@@ -316,10 +356,12 @@ DEBUG=False
 
 # Chave secreta do Django — usada para encriptar sessions e tokens CSRF.
 # Deve ser longa, aleatória e nunca partilhada.
+# O script deploy-new.ps1 gera-a automaticamente.
 SECRET_KEY=GERAR_COM_O_SCRIPT_ABAIXO
 
-# Hosts que podem aceder ao backend. Separados por vírgula.
-ALLOWED_HOSTS=backendcartasocial.dgis.gov.cv,84.247.171.243,localhost
+# NOTA: ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS NÃO são lidos do .env —
+# estão hardcoded em BackEnd/mfids/core/settings.py e devem ser editados
+# directamente quando o domínio de produção mudar.
 
 # ─── Base de dados ─────────────────────────────────────────────────────────
 DB_ENGINE=postgresql
@@ -367,18 +409,20 @@ API_URL=http://localhost:8000
 
 ### 4.3 Gerar uma SECRET_KEY segura
 
+Usa o módulo `secrets` do Python (criptograficamente seguro, disponível sem instalar nada):
+
 ```powershell
-# Este script gera uma chave aleatória de 50 caracteres.
-# Copia o resultado e cola no .env como valor de SECRET_KEY.
-$chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*(-_=+)'
-$key = -join ((1..50) | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
-Write-Host "SECRET_KEY=$key"
+# Gera uma chave de 50 caracteres usando o módulo secrets do Python.
+# Get-Random do PowerShell NÃO é criptograficamente seguro — não usar para isto.
+python -c "import secrets, string; chars = string.ascii_letters + string.digits + '!@#%^&*(-_=+)'; print('SECRET_KEY=' + ''.join(secrets.choice(chars) for _ in range(50)))"
 ```
 
 **Output esperado** (exemplo — o teu será diferente):
 ```
 SECRET_KEY=xK!9mPqL3nR@7fVwJ2hA5cBdYeZ#8gTuNs0oI4lE6vXb1WjMy
 ```
+
+> 💡 O script `deploy-new.ps1` faz isto automaticamente ao criar o `.env`. Só precisas de executar o comando acima manualmente se criares o `.env` à mão.
 
 ### 4.4 Proteger os ficheiros de configuração
 
@@ -2645,6 +2689,13 @@ Get-Service Redis, CeleryWorker, CeleryBeat, W3SVC | Select-Object Name, Status
 ```
 PRIMEIRA INSTALAÇÃO (servidor novo):
   .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
+  .\scripts\deploy-new.ps1 -Ambiente staging -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
+
+  O script pergunta interactivamente:
+    [1/4] EMAIL_HOST_PASSWORD   (App Password Gmail)
+    [2/4] Domínio de produção   (nota: actualizar settings.py manualmente)
+    [3/4] CELERY_BROKER_URL     (ex: redis://localhost:6379)
+    [4/4] DSN_KEY Sentry        (opcional)
 
 VALIDAR O AMBIENTE (sem fazer deploy):
   .\scripts\sanity-check.ps1                          <- verificação completa
@@ -2656,7 +2707,7 @@ DEPLOY DO DIA A DIA:
   .\scripts\deploy-update.ps1 -Ambiente staging       <- deploy para staging
   .\scripts\deploy-update.ps1 -SkipFrontend           <- só backend (mais rápido)
 
-FLAGS ÚTEIS:
+FLAGS ÚTEIS (deploy-update):
   -SkipMigrations     não aplica migrações (deploy sem alterações à BD)
   -SkipFrontend       não compila o frontend (só backend)
   -SkipSanityCheck    forçar deploy sem validações (emergência)
@@ -2665,8 +2716,10 @@ ROLLBACK (se algo correr mal):
   .\scripts\rollback-app.ps1 -BackupNome snapshot-20261029_1435-producao
 
 LOCK PRESO (deploy anterior falhou sem limpar):
-  Remove-Item "$env:TEMP\cartasocial-deploy-producao.lock" -Force
-  Remove-Item "$env:TEMP\cartasocial-deploy-staging.lock"  -Force
+  Remove-Item "$env:TEMP\cartasocial-deploy-producao.lock"     -Force  <- deploy-update
+  Remove-Item "$env:TEMP\cartasocial-deploy-staging.lock"      -Force
+  Remove-Item "$env:TEMP\cartasocial-deploy-new-producao.lock" -Force  <- deploy-new
+  Remove-Item "$env:TEMP\cartasocial-deploy-new-staging.lock"  -Force
 
 BACKUP MANUAL DA BASE DE DADOS:
   .\scripts\backup-db.ps1
@@ -2682,4 +2735,4 @@ VERIFICAÇÃO DE SAÚDE:
 - *Um deploy major for efectuado*
 - *Um incidente for resolvido com procedimentos novos*
 
-*Versão 3.0 — 2026-10-29*
+*Versão 4.0 — 2026-10-29*
