@@ -50,6 +50,7 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 
 | Script | Quando usar |
 |--------|-------------|
+| `scripts/deploy-new.ps1` | **Primeira instalação** num servidor novo (BD + backend + frontend) |
 | `scripts/deploy-update.ps1` | Actualizar a aplicação (git pull + build + reiniciar) |
 | `scripts/rollback-app.ps1` | Reverter código para versão anterior |
 | `scripts/rollback-db.ps1` | Reverter base de dados para um dump anterior |
@@ -499,10 +500,22 @@ GRANT
 ```
 
 ```powershell
-# ── Passo 3: Restaurar dados de produção (se tiveres um dump) ─────────────────
-# Se tens o ficheiro SQL com os dados, restaura-o agora.
-# Se não tens dump (instalação nova), salta este passo.
-
+# ── Passo 3: Restaurar dados de produção (OBRIGATÓRIO para sistema funcional) ──
+#
+# O dump contém dados que o Django NÃO consegue criar a partir do código:
+#
+#   ┌─────────────────────┬─────────────────────────────────────────────────────┐
+#   │ Tabela              │ O que fica vazio sem o dump                         │
+#   ├─────────────────────┼─────────────────────────────────────────────────────┤
+#   │ geografia           │ Dropdowns de ilha, concelho, freguesia, zona, lugar  │
+#   │ dominio             │ Tipos de equipamento, serviço, regime propriedade... │
+#   │ auth_group          │ Grupos DGIS, Agentes, Proprietário, Gestor, MFIDS   │
+#   │ auth_group_perms    │ Permissões por grupo (ninguém consegue fazer login)  │
+#   └─────────────────────┴─────────────────────────────────────────────────────┘
+#
+# SEM O DUMP: as migrações Django criam as tabelas mas ficam vazias.
+#             O sistema arranca mas não é utilizável.
+#
 # > ⚠️ ATENÇÃO: Só executar isto numa BD acabada de criar (vazia).
 # Se a BD já tiver dados, este passo VAI sobrescrevê-los.
 
