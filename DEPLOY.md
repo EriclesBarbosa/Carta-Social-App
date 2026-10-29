@@ -51,11 +51,67 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 | Script | Quando usar |
 |--------|-------------|
 | `scripts/deploy-new.ps1` | **Primeira instalação** num servidor novo (BD + backend + frontend) |
-| `scripts/deploy-update.ps1` | Actualizar a aplicação (git pull + build + reiniciar) |
+| `scripts/deploy-update.ps1` | Actualizar a aplicação (sanity check + git pull + build + reiniciar) |
+| `scripts/sanity-check.ps1` | Validar o ambiente **antes** de fazer deploy (ou para diagnóstico) |
 | `scripts/rollback-app.ps1` | Reverter código para versão anterior |
 | `scripts/rollback-db.ps1` | Reverter base de dados para um dump anterior |
 | `scripts/backup-db.ps1` | Backup manual ou agendar backup diário |
 | `scripts/health-check.ps1` | Verificar saúde dos serviços (ou agendar verificação automática) |
+
+### Flags do deploy-update.ps1
+
+| Flag | Quando usar |
+|------|-------------|
+| `-Ambiente staging` | Deploy para o ambiente de staging em vez de produção |
+| `-SkipFrontend` | Só actualizar o backend (sem build Next.js — mais rápido) |
+| `-SkipMigrations` | Sem alterações à BD neste deploy |
+| `-SkipSanityCheck` | Forçar deploy ignorando validações (apenas em emergência) |
+
+### Output esperado de um deploy com sucesso
+
+```
+════════════════════════════════════════════════════════
+ Carta Social — Deploy de Actualização (PRODUCAO)
+ Data/hora : 2026-10-29 14:35:00
+════════════════════════════════════════════════════════
+==> 0/7  Sanity check...
+========================================
+  SANITY CHECK  ->  PRODUCAO
+========================================
+  [OK]    venv_prod encontrado
+  [OK]    .env encontrado
+  [OK]    Todas as variáveis obrigatórias presentes no .env
+  [OK]    DEBUG=False (correcto para produção)
+  [OK]    Espaço livre em C:: 18.4 GB (mínimo 3 GB)
+  [OK]    Git: working tree limpa
+  [OK]    Git: branch 'main' (correcto)
+  RESULTADO: PRONTO  —  7 verificações OK  (4.2s)
+========================================
+
+==> 1/7  Snapshot de segurança...
+    Guardado em: C:\apps\cartasocial\backups\snapshot-20261029_1435-producao
+==> 2/7  git pull origin main...
+    git: Already up to date.
+==> 3/7  Dependências Python...
+    requirements.txt sem alterações — a saltar.
+==> 4/7  Migrações de base de dados...
+    Nenhuma migração pendente.
+==> 5/7  collectstatic...
+    static: 142 static files copied.
+==> 6/7  Build do frontend Next.js...
+    build: ✓ Compiled successfully
+    Ficheiros estáticos copiados para standalone.
+==> 7/7  A reiniciar serviços...
+────────────────────────────────────────────────────────
+ Smoke test (aguardar até 30s)...
+✅ Backend responde: HTTP 405 (tentativa 1)
+✅ Frontend responde: HTTP 200 (tentativa 3)
+════════════════════════════════════════════════════════
+ ✅ Deploy concluído com sucesso!
+    Ambiente : PRODUCAO
+    Snapshot : C:\apps\cartasocial\backups\snapshot-20261029_1435-producao
+════════════════════════════════════════════════════════
+```
 
 Copia a pasta `scripts/` para `C:\apps\cartasocial\scripts\` no servidor de produção antes de executar qualquer deploy.
 
@@ -2582,9 +2638,48 @@ Get-Service Redis, CeleryWorker, CeleryBeat, W3SVC | Select-Object Name, Status
 
 ---
 
+---
+
+## Resumo rápido
+
+```
+PRIMEIRA INSTALAÇÃO (servidor novo):
+  .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
+
+VALIDAR O AMBIENTE (sem fazer deploy):
+  .\scripts\sanity-check.ps1                          <- verificação completa
+  .\scripts\sanity-check.ps1 -SkipDjango              <- rápida (sem manage.py check)
+  .\scripts\sanity-check.ps1 -SkipIIS                 <- só .env e git
+
+DEPLOY DO DIA A DIA:
+  .\scripts\deploy-update.ps1                         <- sanity check + pull + build + reiniciar
+  .\scripts\deploy-update.ps1 -Ambiente staging       <- deploy para staging
+  .\scripts\deploy-update.ps1 -SkipFrontend           <- só backend (mais rápido)
+
+FLAGS ÚTEIS:
+  -SkipMigrations     não aplica migrações (deploy sem alterações à BD)
+  -SkipFrontend       não compila o frontend (só backend)
+  -SkipSanityCheck    forçar deploy sem validações (emergência)
+
+ROLLBACK (se algo correr mal):
+  .\scripts\rollback-app.ps1 -BackupNome snapshot-20261029_1435-producao
+
+LOCK PRESO (deploy anterior falhou sem limpar):
+  Remove-Item "$env:TEMP\cartasocial-deploy-producao.lock" -Force
+  Remove-Item "$env:TEMP\cartasocial-deploy-staging.lock"  -Force
+
+BACKUP MANUAL DA BASE DE DADOS:
+  .\scripts\backup-db.ps1
+
+VERIFICAÇÃO DE SAÚDE:
+  .\scripts\health-check.ps1
+```
+
+---
+
 *Este documento deve ser revisto e actualizado sempre que:*
 - *Houver uma alteração significativa na arquitectura*
 - *Um deploy major for efectuado*
 - *Um incidente for resolvido com procedimentos novos*
 
-*Versão 2.0 — 2026-10-23*
+*Versão 3.0 — 2026-10-29*
