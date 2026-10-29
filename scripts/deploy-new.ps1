@@ -25,10 +25,17 @@
 .PARAMETER RepoUrl
     URL do repositório git.
 
+.PARAMETER DryRun
+    Simula a instalação sem fazer nada. Mostra configuração, caminhos e comandos
+    que seriam executados. Útil para validar antes de correr a sério.
+    Todos os pré-requisitos (git, python, node, psql, disco) são verificados mesmo
+    em DryRun. Nenhum ficheiro, base de dados ou serviço é criado ou alterado.
+
 .EXAMPLE
     .\scripts\deploy-new.ps1 -DbPassword "MinhaPass2026!" -DumpPath "C:\dumps\carta_social_data_db.sql"
     .\scripts\deploy-new.ps1 -Ambiente staging -DbPassword "MinhaPass2026!" -DumpPath "C:\dumps\carta_social_data_db.sql"
     .\scripts\deploy-new.ps1 -DbPassword "MinhaPass2026!" -DumpPath "C:\dumps\carta_social_data_db.sql" -AppRoot "D:\apps\cartasocial"
+    .\scripts\deploy-new.ps1 -DbPassword "MinhaPass2026!" -DumpPath "C:\dumps\carta_social_data_db.sql" -DryRun
 
 .NOTES
     Pré-requisitos (instalar manualmente antes de correr este script):
@@ -55,7 +62,8 @@ param(
     [Parameter(Mandatory)]
     [string]$DbPassword,
     [string]$DumpPath  = "",
-    [string]$RepoUrl   = "https://github.com/dgis-cv/carta-social-app.git"
+    [string]$RepoUrl   = "https://github.com/dgis-cv/carta-social-app.git",
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = "Stop"
@@ -115,17 +123,24 @@ $timestamp = Get-Date -Format "yyyyMMdd_HHmm"
 $lockFile  = "$env:TEMP\cartasocial-deploy-new-$Ambiente.lock"
 $LogFile   = "$($cfg.LogDir)\deploy-new-$timestamp.log"
 
-New-Item -ItemType Directory -Path $cfg.LogDir -Force | Out-Null
+if (-not $DryRun) {
+    New-Item -ItemType Directory -Path $cfg.LogDir -Force | Out-Null
+}
 
 function Log($msg) {
-    $line = "[$(Get-Date -Format 'HH:mm:ss')] $msg"
+    $prefix = if ($DryRun) { "[DRY RUN $(Get-Date -Format 'HH:mm:ss')]" } else { "[$(Get-Date -Format 'HH:mm:ss')]" }
+    $line   = "$prefix $msg"
     Write-Host $line
-    Add-Content $LogFile $line
+    if (-not $DryRun) { Add-Content $LogFile $line }
+}
+
+function DryStep($msg) {
+    Write-Host "  [DRY RUN] ▶ $msg" -ForegroundColor DarkYellow
 }
 
 function Abort($msg) {
     Log "❌ ABORTADO: $msg"
-    Log "   Log: $LogFile"
+    if (-not $DryRun) { Log "   Log: $LogFile" }
     Remove-Item $lockFile -Force -ErrorAction SilentlyContinue
     exit 1
 }
@@ -136,22 +151,35 @@ function Check-Command($cmd) {
     }
 }
 
-# ── LOCK: prevenir instalações concorrentes ───────────────────────────────────
-if (Test-Path $lockFile) {
-    $lockInfo = Get-Content $lockFile -Raw -ErrorAction SilentlyContinue
+# ── Modo DryRun: banner ───────────────────────────────────────────────────────
+if ($DryRun) {
     Write-Host ""
-    Write-Host "ERRO: Deploy já em curso para '$($Ambiente.ToUpper())'!" -ForegroundColor Red
-    Write-Host "  Iniciado por: $lockInfo" -ForegroundColor Yellow
-    Write-Host "  Se não há deploy activo, remover: $lockFile`n" -ForegroundColor Gray
-    exit 1
+    Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor DarkYellow
+    Write-Host "  ║  MODO DRY RUN — simulação sem alterações reais          ║" -ForegroundColor DarkYellow
+    Write-Host "  ║  Pré-requisitos verificados. Nenhum ficheiro,           ║" -ForegroundColor DarkYellow
+    Write-Host "  ║  base de dados ou serviço será criado ou alterado.      ║" -ForegroundColor DarkYellow
+    Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor DarkYellow
+    Write-Host ""
 }
-"$(whoami) | $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | $env:COMPUTERNAME" `
-    | Set-Content $lockFile -Encoding UTF8
+
+# ── LOCK: prevenir instalações concorrentes (ignorado em DryRun) ──────────────
+if (-not $DryRun) {
+    if (Test-Path $lockFile) {
+        $lockInfo = Get-Content $lockFile -Raw -ErrorAction SilentlyContinue
+        Write-Host ""
+        Write-Host "ERRO: Deploy já em curso para '$($Ambiente.ToUpper())'!" -ForegroundColor Red
+        Write-Host "  Iniciado por: $lockInfo" -ForegroundColor Yellow
+        Write-Host "  Se não há deploy activo, remover: $lockFile`n" -ForegroundColor Gray
+        exit 1
+    }
+    "$(whoami) | $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') | $env:COMPUTERNAME" `
+        | Set-Content $lockFile -Encoding UTF8
+}
 
 try {
 
 Log "════════════════════════════════════════════════════════"
-Log " Carta Social — Deploy de Nova Instalação ($($Ambiente.ToUpper()))"
+Log " Carta Social — Deploy de Nova Instalação ($($Ambiente.ToUpper()))$(if ($DryRun) { ' [DRY RUN]' })"
 Log " Data/hora : $(Get-Date)"
 Log " AppRoot   : $($cfg.AppRoot)"
 Log " Dump      : $(if ($DumpPath) { $DumpPath } else { 'NÃO fornecido — dados iniciais em falta' })"
@@ -213,51 +241,73 @@ if (-not $DumpPath) {
 
 # ── FASE 1: Criar estrutura de pastas ─────────────────────────────────────────
 Log "==> 1/9  A criar estrutura de pastas..."
-New-Item -ItemType Directory -Path "$($cfg.AppRoot)\backend"  -Force | Out-Null
-New-Item -ItemType Directory -Path "$($cfg.AppRoot)\frontend" -Force | Out-Null
-New-Item -ItemType Directory -Path $cfg.BackupDir             -Force | Out-Null
+if ($DryRun) {
+    DryStep "New-Item $($cfg.AppRoot)\backend"
+    DryStep "New-Item $($cfg.AppRoot)\frontend"
+    DryStep "New-Item $($cfg.BackupDir)"
+} else {
+    New-Item -ItemType Directory -Path "$($cfg.AppRoot)\backend"  -Force | Out-Null
+    New-Item -ItemType Directory -Path "$($cfg.AppRoot)\frontend" -Force | Out-Null
+    New-Item -ItemType Directory -Path $cfg.BackupDir             -Force | Out-Null
+}
 
 # ── FASE 2: Clonar repositório ────────────────────────────────────────────────
 Log "==> 2/9  A clonar repositório..."
-if (Test-Path "$($cfg.AppRoot)\backend\.git") {
-    Log "    Repositório já existe — a fazer pull..."
-    Set-Location "$($cfg.AppRoot)\backend"
-    git pull origin main 2>&1 | ForEach-Object { Log "    git: $_" }
+if ($DryRun) {
+    DryStep "git clone $RepoUrl '$($cfg.AppRoot)\backend'"
+    DryStep "Copy-Item backend\mfids_cs_app → $($cfg.FrontDir)"
 } else {
-    git clone $RepoUrl "$($cfg.AppRoot)\backend" 2>&1 | ForEach-Object { Log "    git: $_" }
-    if ($LASTEXITCODE -ne 0) { Abort "git clone falhou" }
-}
-
-# Copiar frontend para pasta separada
-if (-not (Test-Path $cfg.FrontDir)) {
-    Copy-Item "$($cfg.AppRoot)\backend\mfids_cs_app" $cfg.FrontDir -Recurse
-    Log "    Frontend copiado para $($cfg.FrontDir)"
+    if (Test-Path "$($cfg.AppRoot)\backend\.git") {
+        Log "    Repositório já existe — a fazer pull..."
+        Set-Location "$($cfg.AppRoot)\backend"
+        git pull origin main 2>&1 | ForEach-Object { Log "    git: $_" }
+    } else {
+        git clone $RepoUrl "$($cfg.AppRoot)\backend" 2>&1 | ForEach-Object { Log "    git: $_" }
+        if ($LASTEXITCODE -ne 0) { Abort "git clone falhou" }
+    }
+    if (-not (Test-Path $cfg.FrontDir)) {
+        Copy-Item "$($cfg.AppRoot)\backend\mfids_cs_app" $cfg.FrontDir -Recurse
+        Log "    Frontend copiado para $($cfg.FrontDir)"
+    }
 }
 
 # ── FASE 3: Configurar base de dados PostgreSQL ───────────────────────────────
 Log "==> 3/9  A configurar base de dados PostgreSQL..."
 Log "    DB: $($cfg.DbName)  |  Utilizador: $($cfg.DbUser)"
 
-$env:PGPASSWORD = "postgres"   # password do superuser postgres (ajustar se necessário)
+if ($DryRun) {
+    DryStep "psql -U postgres → CREATE USER $($cfg.DbUser) (password: ***)"
+    DryStep "psql -U postgres → CREATE DATABASE $($cfg.DbName) OWNER $($cfg.DbUser)"
+    if ($DumpPath) {
+        Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
+        Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
+        Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
+        Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
+        Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
+        DryStep "psql -U $($cfg.DbUser) -d $($cfg.DbName) -f $DumpPath"
+    }
+} else {
+    $env:PGPASSWORD = "postgres"
 
-$createUser = "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$($cfg.DbUser)') THEN CREATE USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; END IF; END `$`$;"
-$createDb   = "SELECT 'CREATE DATABASE ""$($cfg.DbName)"" OWNER $($cfg.DbUser)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$($cfg.DbName)')\gexec"
+    $createUser = "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$($cfg.DbUser)') THEN CREATE USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; END IF; END `$`$;"
+    $createDb   = "SELECT 'CREATE DATABASE ""$($cfg.DbName)"" OWNER $($cfg.DbUser)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$($cfg.DbName)')\gexec"
 
-psql -U postgres -c $createUser 2>&1 | ForEach-Object { Log "    pg: $_" }
-psql -U postgres -c $createDb   2>&1 | ForEach-Object { Log "    pg: $_" }
+    psql -U postgres -c $createUser 2>&1 | ForEach-Object { Log "    pg: $_" }
+    psql -U postgres -c $createDb   2>&1 | ForEach-Object { Log "    pg: $_" }
 
-if ($DumpPath) {
-    Log "    A restaurar dump de produção (pode demorar alguns minutos)..."
-    Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
-    Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
-    Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
-    Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
-    Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
-    $env:PGPASSWORD = $DbPassword
-    psql -U $cfg.DbUser -d $cfg.DbName -f $DumpPath 2>&1 | ForEach-Object { Log "    pg: $_" }
-    if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
-    Log "    ✅ Dump restaurado — geografia, domínios, grupos e permissões disponíveis."
-    $env:PGPASSWORD = ""
+    if ($DumpPath) {
+        Log "    A restaurar dump de produção (pode demorar alguns minutos)..."
+        Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
+        Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
+        Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
+        Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
+        Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
+        $env:PGPASSWORD = $DbPassword
+        psql -U $cfg.DbUser -d $cfg.DbName -f $DumpPath 2>&1 | ForEach-Object { Log "    pg: $_" }
+        if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
+        Log "    ✅ Dump restaurado — geografia, domínios, grupos e permissões disponíveis."
+        $env:PGPASSWORD = ""
+    }
 }
 
 # ── FASE 4: Configurar .env do backend ────────────────────────────────────────
@@ -322,8 +372,17 @@ EMAIL_HOST_PASSWORD=$emailPass
         $envContent += "`nDSN_KEY=$sentryDsn"
     }
 
-    Set-Content $envFile $envContent -Encoding UTF8
-    Log "    ✅ .env criado com as variáveis configuradas."
+    if ($DryRun) {
+        Log "    [DRY RUN] .env NÃO criado. Conteúdo que seria escrito em $envFile`:"
+        $envContent -split "`n" | ForEach-Object {
+            # Mascarar passwords na visualização
+            $masked = $_ -replace '(DB_PASS|EMAIL_HOST_PASSWORD|SECRET_KEY|DSN_KEY)=(.+)', '$1=***'
+            Write-Host "      $_" -ForegroundColor Gray
+        }
+    } else {
+        Set-Content $envFile $envContent -Encoding UTF8
+        Log "    ✅ .env criado com as variáveis configuradas."
+    }
 
     # Nota sobre ALLOWED_HOSTS se domínio foi fornecido
     if ($prodDomain) {
@@ -341,27 +400,40 @@ EMAIL_HOST_PASSWORD=$emailPass
 
 # ── FASE 5: Instalar dependências Python e migrar ─────────────────────────────
 Log "==> 5/9  A instalar dependências Python..."
-Set-Location $cfg.BackendDir
-
-if (-not (Test-Path $cfg.Python)) {
-    python -m venv venv_prod 2>&1 | ForEach-Object { Log "    venv: $_" }
+if ($DryRun) {
+    DryStep "python -m venv $($cfg.BackendDir)\venv_prod"
+    DryStep "pip install -r $($cfg.BackendDir)\requirements.txt"
+    DryStep "python manage.py migrate"
+    DryStep "python manage.py collectstatic --no-input"
 } else {
-    Log "    venv_prod já existe."
+    Set-Location $cfg.BackendDir
+    if (-not (Test-Path $cfg.Python)) {
+        python -m venv venv_prod 2>&1 | ForEach-Object { Log "    venv: $_" }
+    } else {
+        Log "    venv_prod já existe."
+    }
+    & $cfg.Pip install --upgrade pip 2>&1 | Out-Null
+    & $cfg.Pip install -r requirements.txt 2>&1 | ForEach-Object { Log "    pip: $_" }
+    if ($LASTEXITCODE -ne 0) { Abort "pip install falhou" }
+
+    Log "    A aplicar migrações Django..."
+    & $cfg.Python manage.py migrate 2>&1 | ForEach-Object { Log "    migrate: $_" }
+    if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
+
+    Log "    A recolher ficheiros estáticos..."
+    & $cfg.Python manage.py collectstatic --no-input 2>&1 | ForEach-Object { Log "    static: $_" }
+    if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
 }
-& $cfg.Pip install --upgrade pip 2>&1 | Out-Null
-& $cfg.Pip install -r requirements.txt 2>&1 | ForEach-Object { Log "    pip: $_" }
-if ($LASTEXITCODE -ne 0) { Abort "pip install falhou" }
-
-Log "    A aplicar migrações Django..."
-& $cfg.Python manage.py migrate 2>&1 | ForEach-Object { Log "    migrate: $_" }
-if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
-
-Log "    A recolher ficheiros estáticos..."
-& $cfg.Python manage.py collectstatic --no-input 2>&1 | ForEach-Object { Log "    static: $_" }
-if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
 
 # ── FASE 6: Verificar dados críticos ──────────────────────────────────────────
 Log "==> 6/9  A verificar dados críticos na base de dados..."
+
+$dadosCriticosEmFalta = $false   # usado no resumo final
+
+if ($DryRun) {
+    Log "    [DRY RUN] Verificação ignorada — BD não foi criada neste modo."
+    Log "    Após instalação real, a Fase 6 verifica: geografia, dominio, auth_group, auth_group_permissions."
+} else {
 
 $pyCheck = @"
 import django, os, sys
@@ -430,88 +502,132 @@ if ($dadosCriticosEmFalta) {
     Log "⚠️  DADOS CRÍTICOS EM FALTA — sistema inutilizável sem importar o dump."
 }
 
+} # end if (-not $DryRun) para Fase 6
+
 # ── FASE 7: Build do frontend Next.js ─────────────────────────────────────────
 Log "==> 7/9  A construir frontend Next.js..."
-Set-Location $cfg.FrontDir
+if ($DryRun) {
+    Log "    .env.local seria criado em: $($cfg.FrontDir)\.env.local"
+    Log "    Conteúdo: API_URL=$($cfg.ApiUrl)"
+    DryStep "npm ci --legacy-peer-deps  (pasta: $($cfg.FrontDir))"
+    DryStep "npm run build"
+    DryStep "Copy public + .next\static → .next\standalone"
+} else {
+    Set-Location $cfg.FrontDir
 
-$envLocal = "$($cfg.FrontDir)\.env.local"
-if (-not (Test-Path $envLocal)) {
-    Set-Content $envLocal "API_URL=$($cfg.ApiUrl)" -Encoding UTF8
-    Log "    .env.local criado com API_URL=$($cfg.ApiUrl)"
+    $envLocal = "$($cfg.FrontDir)\.env.local"
+    if (-not (Test-Path $envLocal)) {
+        Set-Content $envLocal "API_URL=$($cfg.ApiUrl)" -Encoding UTF8
+        Log "    .env.local criado com API_URL=$($cfg.ApiUrl)"
+    }
+
+    npm ci --legacy-peer-deps 2>&1 | ForEach-Object { Log "    npm: $_" }
+    if ($LASTEXITCODE -ne 0) { Abort "npm ci falhou" }
+
+    npm run build 2>&1 | ForEach-Object { Log "    build: $_" }
+    if ($LASTEXITCODE -ne 0) { Abort "npm run build falhou" }
+
+    Copy-Item "$($cfg.FrontDir)\public"       "$($cfg.FrontDir)\.next\standalone\public"       -Recurse -Force
+    Copy-Item "$($cfg.FrontDir)\.next\static" "$($cfg.FrontDir)\.next\standalone\.next\static" -Recurse -Force
+    Log "    ✅ Build completo e assets copiados para standalone."
 }
-
-npm ci --legacy-peer-deps 2>&1 | ForEach-Object { Log "    npm: $_" }
-if ($LASTEXITCODE -ne 0) { Abort "npm ci falhou" }
-
-npm run build 2>&1 | ForEach-Object { Log "    build: $_" }
-if ($LASTEXITCODE -ne 0) { Abort "npm run build falhou" }
-
-Copy-Item "$($cfg.FrontDir)\public"       "$($cfg.FrontDir)\.next\standalone\public"       -Recurse -Force
-Copy-Item "$($cfg.FrontDir)\.next\static" "$($cfg.FrontDir)\.next\standalone\.next\static" -Recurse -Force
-Log "    ✅ Build completo e assets copiados para standalone."
 
 # ── FASE 8: Configurar IIS ────────────────────────────────────────────────────
 Log "==> 8/9  A configurar IIS..."
-Import-Module WebAdministration -ErrorAction SilentlyContinue
-
-if (-not (Get-Module WebAdministration)) {
-    Log "⚠️  Módulo WebAdministration não disponível — configuração IIS ignorada."
-    Log "   Configura manualmente os dois sites IIS:"
-    Log "     $($cfg.IIS_API)  → porta $($cfg.IIS_API_Port) → $($cfg.BackendDir)"
-    Log "     $($cfg.IIS_App)  → porta $($cfg.IIS_App_Port) → $($cfg.FrontDir)\.next\standalone"
+if ($DryRun) {
+    DryStep "New-Website '$($cfg.IIS_API)' -Port $($cfg.IIS_API_Port) -PhysicalPath '$($cfg.BackendDir)'"
+    DryStep "New-Website '$($cfg.IIS_App)' -Port $($cfg.IIS_App_Port) -PhysicalPath '$($cfg.FrontDir)\.next\standalone'"
 } else {
-    if (-not (Get-Website -Name $cfg.IIS_API -ErrorAction SilentlyContinue)) {
-        New-Website -Name $cfg.IIS_API -Port $cfg.IIS_API_Port -PhysicalPath $cfg.BackendDir -Force
-        Log "    Site $($cfg.IIS_API) criado na porta $($cfg.IIS_API_Port)."
-    } else {
-        Log "    Site $($cfg.IIS_API) já existe."
-    }
+    Import-Module WebAdministration -ErrorAction SilentlyContinue
 
-    if (-not (Get-Website -Name $cfg.IIS_App -ErrorAction SilentlyContinue)) {
-        New-Website -Name $cfg.IIS_App -Port $cfg.IIS_App_Port -PhysicalPath "$($cfg.FrontDir)\.next\standalone" -Force
-        Log "    Site $($cfg.IIS_App) criado na porta $($cfg.IIS_App_Port)."
+    if (-not (Get-Module WebAdministration)) {
+        Log "⚠️  Módulo WebAdministration não disponível — configuração IIS ignorada."
+        Log "   Configura manualmente os dois sites IIS:"
+        Log "     $($cfg.IIS_API)  → porta $($cfg.IIS_API_Port) → $($cfg.BackendDir)"
+        Log "     $($cfg.IIS_App)  → porta $($cfg.IIS_App_Port) → $($cfg.FrontDir)\.next\standalone"
     } else {
-        Log "    Site $($cfg.IIS_App) já existe."
+        if (-not (Get-Website -Name $cfg.IIS_API -ErrorAction SilentlyContinue)) {
+            New-Website -Name $cfg.IIS_API -Port $cfg.IIS_API_Port -PhysicalPath $cfg.BackendDir -Force
+            Log "    Site $($cfg.IIS_API) criado na porta $($cfg.IIS_API_Port)."
+        } else {
+            Log "    Site $($cfg.IIS_API) já existe."
+        }
+
+        if (-not (Get-Website -Name $cfg.IIS_App -ErrorAction SilentlyContinue)) {
+            New-Website -Name $cfg.IIS_App -Port $cfg.IIS_App_Port -PhysicalPath "$($cfg.FrontDir)\.next\standalone" -Force
+            Log "    Site $($cfg.IIS_App) criado na porta $($cfg.IIS_App_Port)."
+        } else {
+            Log "    Site $($cfg.IIS_App) já existe."
+        }
     }
 }
 
 # ── FASE 9: Smoke test (Django directo, sem IIS) ──────────────────────────────
 Log "==> 9/9  Smoke test (servidor de teste directo)..."
-Set-Location $cfg.BackendDir
+if ($DryRun) {
+    DryStep "Start-Process python manage.py runserver 127.0.0.1:$($cfg.SmokePort)"
+    DryStep "Invoke-WebRequest http://127.0.0.1:$($cfg.SmokePort)/api/login/ (10 tentativas × 3s)"
+    Log "    [DRY RUN] Smoke test ignorado — servidor não foi iniciado."
+} else {
+    Set-Location $cfg.BackendDir
 
-$smokeUrl = "http://127.0.0.1:$($cfg.SmokePort)/api/login/"
-$djProc   = Start-Process -FilePath $cfg.Python `
-                          -ArgumentList "manage.py runserver 127.0.0.1:$($cfg.SmokePort) --noreload" `
-                          -PassThru -WindowStyle Hidden
-Log "    Servidor de teste a iniciar (PID $($djProc.Id), porta $($cfg.SmokePort))..."
+    $smokeUrl = "http://127.0.0.1:$($cfg.SmokePort)/api/login/"
+    $djProc   = Start-Process -FilePath $cfg.Python `
+                              -ArgumentList "manage.py runserver 127.0.0.1:$($cfg.SmokePort) --noreload" `
+                              -PassThru -WindowStyle Hidden
+    Log "    Servidor de teste a iniciar (PID $($djProc.Id), porta $($cfg.SmokePort))..."
 
-$maxTries = 10; $interval = 3
-$smokeOK  = $false
-for ($i = 1; $i -le $maxTries; $i++) {
-    try {
-        $r = Invoke-WebRequest -Uri $smokeUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
-        if ($r.StatusCode -in 200, 405) {
-            Log "✅ Django responde: HTTP $($r.StatusCode) (tentativa $i)"
-            $smokeOK = $true; break
+    $maxTries = 10; $interval = 3
+    $smokeOK  = $false
+    for ($i = 1; $i -le $maxTries; $i++) {
+        try {
+            $r = Invoke-WebRequest -Uri $smokeUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+            if ($r.StatusCode -in 200, 405) {
+                Log "✅ Django responde: HTTP $($r.StatusCode) (tentativa $i)"
+                $smokeOK = $true; break
+            }
+        } catch {
+            if ($_.Exception.Response) {
+                $code = [int]$_.Exception.Response.StatusCode
+                if ($code -in 200, 405) { Log "✅ Django: HTTP $code"; $smokeOK = $true; break }
+            }
+            if ($i -lt $maxTries) { Start-Sleep -Seconds $interval }
         }
-    } catch {
-        if ($_.Exception.Response) {
-            $code = [int]$_.Exception.Response.StatusCode
-            if ($code -in 200, 405) { Log "✅ Django: HTTP $code"; $smokeOK = $true; break }
-        }
-        if ($i -lt $maxTries) { Start-Sleep -Seconds $interval }
     }
-}
-$djProc | Stop-Process -ErrorAction SilentlyContinue
+    $djProc | Stop-Process -ErrorAction SilentlyContinue
 
-if (-not $smokeOK) {
-    Log "⚠️  Django não respondeu após $($maxTries * $interval)s — verificar log acima para erros."
-    Log "   A instalação pode ainda funcionar após configurar IIS correctamente."
+    if (-not $smokeOK) {
+        Log "⚠️  Django não respondeu após $($maxTries * $interval)s — verificar log acima para erros."
+        Log "   A instalação pode ainda funcionar após configurar IIS correctamente."
+    }
 }
 
 Log "════════════════════════════════════════════════════════"
-Log " ✅ Deploy de nova instalação concluído!"
-Log ""
+if ($DryRun) {
+    Log " ✅ DRY RUN concluído — nenhuma alteração foi efectuada."
+    Log ""
+    Log " O que foi verificado (checks reais):"
+    Log "   ✅ Pré-requisitos: git, python, node, npm, psql"
+    Log "   ✅ Espaço em disco"
+    if ($DumpPath) { Log "   ✅ Ficheiro de dump existe: $DumpPath" }
+    Log ""
+    Log " O que seria executado (simulado):"
+    Log "   • Criar pastas em $($cfg.AppRoot)"
+    Log "   • git clone $RepoUrl"
+    Log "   • psql CREATE USER $($cfg.DbUser) + CREATE DATABASE $($cfg.DbName)"
+    if ($DumpPath) { Log "   • psql restaurar dump: $DumpPath" }
+    Log "   • Criar .env (com SECRET_KEY gerada + valores da configuração guiada)"
+    Log "   • python -m venv + pip install + migrate + collectstatic"
+    Log "   • npm ci + npm run build (pode demorar ~10 min)"
+    Log "   • Criar sites IIS: $($cfg.IIS_API) (porta $($cfg.IIS_API_Port)) e $($cfg.IIS_App) (porta $($cfg.IIS_App_Port))"
+    Log "   • Smoke test Django em porta $($cfg.SmokePort)"
+    Log ""
+    Log " Para executar a sério (sem -DryRun):"
+    Log "   .\scripts\deploy-new.ps1 -DbPassword `"***`" -DumpPath `"$DumpPath`" -Ambiente $Ambiente"
+} else {
+    Log " ✅ Deploy de nova instalação concluído!"
+    Log ""
+}
 if ($dadosCriticosEmFalta) {
     Log " ══ ⚠️  SISTEMA INUTILIZÁVEL — DADOS EM FALTA ══"
     Log "  URGENTE — importar dump antes de qualquer outra coisa:"
