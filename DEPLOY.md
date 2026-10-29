@@ -70,6 +70,62 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 | `-AppRoot "D:\apps\cartasocial"` | Usar uma pasta raiz diferente do padrão |
 | `-DbPassword "Pass123!"` | **(Obrigatório)** Password para o utilizador PostgreSQL |
 | `-DumpPath "C:\dumps\carta_social_data_db.sql"` | Dump de BD com geografia, domínios e grupos/permissões |
+| `-DryRun` | **Simula** a instalação sem fazer nada — verifica pré-requisitos e mostra o que seria executado |
+
+#### Modo DryRun — testar sem máquina nova
+
+O `-DryRun` é a forma de validar o script antes de o correr a sério, sem precisar de uma máquina dedicada.
+
+```powershell
+.\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql" -DryRun
+```
+
+**O que faz a sério (checks reais):**
+- Verifica que `git`, `python`, `node`, `npm` e `psql` estão instalados e no PATH
+- Verifica que há pelo menos 5 GB de espaço em disco
+- Verifica que o ficheiro de dump existe no caminho indicado
+- Faz as 4 perguntas interactivas de configuração de secrets
+
+**O que simula (sem tocar em nada):**
+- Mostra em amarelo cada operação que seria executada
+- Apresenta o conteúdo do `.env` que seria criado (passwords mascaradas)
+- Não cria ficheiros, bases de dados, serviços IIS nem processos
+
+**Output esperado (excerto):**
+
+```
+  ╔══════════════════════════════════════════════════════════╗
+  ║  MODO DRY RUN — simulação sem alterações reais          ║
+  ║  Pré-requisitos verificados. Nenhum ficheiro,           ║
+  ║  base de dados ou serviço será criado ou alterado.      ║
+  ╚══════════════════════════════════════════════════════════╝
+
+==> 0/9  A verificar pré-requisitos...
+    Python : Python 3.11.9
+    Node   : v20.17.0
+    Disco  : 47.3 GB livres em C:
+==> 1/9  A criar estrutura de pastas...
+  [DRY RUN] ▶ New-Item C:\apps\cartasocial\backend
+  [DRY RUN] ▶ New-Item C:\apps\cartasocial\frontend
+==> 2/9  A clonar repositório...
+  [DRY RUN] ▶ git clone https://github.com/... 'C:\apps\cartasocial\backend'
+==> 3/9  A configurar base de dados PostgreSQL...
+  [DRY RUN] ▶ psql -U postgres → CREATE USER mfids_user (password: ***)
+  [DRY RUN] ▶ psql -U mfids_user -d DB_DGIS_SITE -f C:\dumps\carta_social_data_db.sql
+...
+==> 9/9  Smoke test...
+  [DRY RUN] Smoke test ignorado — servidor não foi iniciado.
+
+✅ DRY RUN concluído — nenhuma alteração foi efectuada.
+   O que foi verificado: pré-requisitos ✅  dump ✅  disco ✅
+   Para executar a sério (sem -DryRun):
+     .\scripts\deploy-new.ps1 -DbPassword "***" -DumpPath "C:\dumps\..." -Ambiente PRODUCAO
+```
+
+> 💡 **Sequência recomendada para nova instalação:**
+> 1. Instalar os pré-requisitos (secção 3.2)
+> 2. Correr `-DryRun` e confirmar que todos os checks passam e os caminhos estão correctos
+> 3. Correr sem `-DryRun` para a instalação real
 
 #### Output esperado da configuração guiada (Fase 4)
 
@@ -2691,6 +2747,10 @@ Get-Service Redis, CeleryWorker, CeleryBeat, W3SVC | Select-Object Name, Status
 ## Resumo rápido
 
 ```
+TESTAR ANTES DE INSTALAR (sem máquina nova, sem tocar em nada):
+  .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql" -DryRun
+  <- verifica pré-requisitos, disco e dump; mostra tudo o que seria executado
+
 PRIMEIRA INSTALAÇÃO (servidor novo):
   .\scripts\deploy-new.ps1 -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
   .\scripts\deploy-new.ps1 -Ambiente staging -DbPassword "MinhaPass!" -DumpPath "C:\dumps\carta_social_data_db.sql"
