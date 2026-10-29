@@ -58,6 +58,10 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 | `scripts/backup-db.ps1` | Backup manual ou agendar backup diário |
 | `scripts/health-check.ps1` | Verificar saúde dos serviços (ou agendar verificação automática) |
 
+> ⚠️ **Antes de executar `deploy-new.ps1`** num servidor novo, é obrigatório instalar manualmente os pré-requisitos listados na [secção 3.2](#32-software-a-instalar-no-servidor): Python 3.11+, Node.js 20 LTS, PostgreSQL 16, Git e os módulos IIS. O script verifica se estão presentes e aborta se algum faltar.
+>
+> Também é necessário ter o ficheiro de dump da base de dados (`carta_social_data_db.sql`) — sem ele, o sistema instala mas **não é utilizável** (dropdowns vazios, login impossível). Ver [secção 3.1](#31-acesso-e-credenciais-necessárias).
+
 ### Flags do deploy-new.ps1
 
 | Flag | Quando usar |
@@ -289,7 +293,7 @@ Precisas de instalar estes programas **antes** de começar os passos abaixo. Tod
 | # | Software | Versão | Link de download |
 |---|---|---|---|
 | 1 | Python | 3.11.x (64-bit) | https://python.org/downloads |
-| 2 | Node.js | 18 LTS (64-bit) | https://nodejs.org |
+| 2 | Node.js | 20 LTS (64-bit) | https://nodejs.org |
 | 3 | PostgreSQL | 16.x (64-bit) | https://www.enterprisedb.com/downloads/postgres-postgresql-downloads |
 | 4 | Redis for Windows | 7.x | https://github.com/tporadowski/redis/releases |
 | 5 | NSSM | 2.24+ | https://nssm.cc/download |
@@ -312,7 +316,7 @@ Abre o **PowerShell como Administrador** e executa:
 # Verificar Python — deve mostrar "Python 3.11.x"
 python --version
 
-# Verificar Node.js — deve mostrar "v18.x.x"
+# Verificar Node.js — deve mostrar "v20.x.x"
 node --version
 
 # Verificar npm — deve mostrar "10.x.x"
