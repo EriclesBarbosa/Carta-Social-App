@@ -533,6 +533,7 @@ if ($DryRun) {
 
 $pyCheck = @"
 import django, os, sys
+sys.path.insert(0, os.getcwd())
 os.environ.setdefault('DJANGO_SETTINGS_MODULE','core.settings')
 django.setup()
 from apps.organizacoes.models import Geografia
