@@ -337,7 +337,7 @@ if ($DryRun) {
 } else {
     $env:PGPASSWORD = $PostgresPassword
 
-    $createUser = "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$($cfg.DbUser)') THEN CREATE USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; END IF; END `$`$;"
+    $createUser = "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$($cfg.DbUser)') THEN CREATE USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; ELSE ALTER USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; END IF; END `$`$;"
 
     # Usar ficheiros SQL temporários para evitar problemas de quoting do PowerShell
     # com identificadores PostgreSQL que contêm maiúsculas.
@@ -490,7 +490,7 @@ if ($DryRun) {
     if ($LASTEXITCODE -ne 0) { Abort "pip install falhou" }
 
     Log "    A aplicar migracoes Django..."
-    & $cfg.Python manage.py migrate
+    & $cfg.Python manage.py migrate 2>&1 | Tee-Object -Append -FilePath $LogFile
     if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
 
     # Criar tabelas legadas (managed=False) que nao sao criadas pelo migrate
@@ -561,11 +561,11 @@ if ($DryRun) {
     }
 
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
-    & $cfg.Python manage.py check --deploy
+    & $cfg.Python manage.py check --deploy 2>&1 | Tee-Object -Append -FilePath $LogFile
     if ($LASTEXITCODE -ne 0) { Abort "manage.py check --deploy encontrou erros — corrigir antes de continuar (DEBUG=True, ALLOWED_HOSTS, etc.)." }
 
     Log "    A recolher ficheiros estaticos..."
-    & $cfg.Python manage.py collectstatic --no-input
+    & $cfg.Python manage.py collectstatic --no-input 2>&1 | Tee-Object -Append -FilePath $LogFile
     if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
 }
 
