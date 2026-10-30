@@ -364,96 +364,110 @@ if ($DryRun) {
     $ErrorActionPreference = "Stop"
 }
 
-# ── FASE 4: Configurar .env do backend ────────────────────────────────────────
-Log "==> 4/9  A configurar .env do backend..."
+# ── FASE 4: Configurar variáveis de ambiente ──────────────────────────────────
+# Segredos (SECRET_KEY, DB_PASS, EMAIL_HOST_PASSWORD, etc.) são guardados como
+# variáveis de ambiente do Windows (Machine level) — sem ficheiro com passwords.
+# Valores não-sensíveis (DB_ENGINE, DB_HOST, etc.) ficam num .env mínimo.
+Log "==> 4/9  A configurar variáveis de ambiente..."
 $envFile = "$($cfg.BackendDir)\.env"
-if (-not (Test-Path $envFile)) {
-    if ($DryRun) {
-        Log "    .env não existe — em deploy real seria criado com configuração guiada."
-        DryStep "Gerar SECRET_KEY (python secrets module)"
-        DryStep "Perguntar: EMAIL_HOST_PASSWORD, DOMÍNIO, CELERY_BROKER_URL, DSN_KEY"
-        DryStep "Escrever .env em $envFile com:"
-        Write-Host "      DEBUG=False"                                       -ForegroundColor Gray
-        Write-Host "      SECRET_KEY=<gerado automaticamente>"               -ForegroundColor Gray
-        Write-Host "      DB_ENGINE=postgresql"                              -ForegroundColor Gray
-        Write-Host "      DB_HOST=localhost"                                 -ForegroundColor Gray
-        Write-Host "      DB_PORT=5432"                                      -ForegroundColor Gray
-        Write-Host "      DB_NAME=$($cfg.DbName)"                            -ForegroundColor Gray
-        Write-Host "      DB_USERNAME=$($cfg.DbUser)"                        -ForegroundColor Gray
-        Write-Host "      DB_PASS=***"                                       -ForegroundColor Gray
-        Write-Host "      EMAIL_HOST_PASSWORD=<resposta do utilizador>"      -ForegroundColor Gray
-        Write-Host "      CELERY_BROKER=<resposta do utilizador, se fornecida>" -ForegroundColor Gray
-        Write-Host "      DSN_KEY=<resposta do utilizador, se fornecida>"    -ForegroundColor Gray
-        $emailPass  = ""
-        $prodDomain = ""
+
+if ($DryRun) {
+    Log "    Segredos seriam guardados como variáveis de ambiente do Windows (Machine level)."
+    DryStep "Gerar SECRET_KEY (python secrets module)"
+    DryStep "Perguntar: EMAIL_HOST_PASSWORD, DOMÍNIO, CELERY_BROKER_URL, DSN_KEY"
+    DryStep "[System.Environment]::SetEnvironmentVariable('SECRET_KEY', '...', 'Machine')"
+    DryStep "[System.Environment]::SetEnvironmentVariable('DB_PASS', '***', 'Machine')"
+    DryStep "Criar .env mínimo (apenas config não-sensível) em $envFile"
+    Write-Host "      DEBUG=False"                   -ForegroundColor Gray
+    Write-Host "      DB_ENGINE=postgresql"          -ForegroundColor Gray
+    Write-Host "      DB_HOST=localhost"             -ForegroundColor Gray
+    Write-Host "      DB_PORT=5432"                  -ForegroundColor Gray
+    Write-Host "      DB_NAME=$($cfg.DbName)"        -ForegroundColor Gray
+    Write-Host "      DB_USERNAME=$($cfg.DbUser)"    -ForegroundColor Gray
+    $emailPass  = ""
+    $prodDomain = ""
+} else {
+    Write-Host ""
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "   Configuração de Secrets" -ForegroundColor Cyan
+    Write-Host "   Os valores sensíveis são guardados como variáveis de" -ForegroundColor Cyan
+    Write-Host "   ambiente do Windows — NÃO em ficheiro .env." -ForegroundColor Cyan
+    Write-Host "   Prima ENTER para deixar vazio (pode preencher depois)." -ForegroundColor Gray
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+
+    Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
+    Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
+    Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
+    $emailPass = Read-Host "        Valor"
+
+    Write-Host ""
+    Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
+    Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
+    Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
+    $prodDomain = Read-Host "        Valor"
+
+    Write-Host ""
+    Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
+    Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
+    $celeryBroker = Read-Host "        Valor"
+
+    Write-Host ""
+    Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
+    Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
+    $sentryDsn = Read-Host "        Valor"
+
+    Write-Host ""
+
+    # Gerar ou reutilizar SECRET_KEY existente
+    $existingKey = [System.Environment]::GetEnvironmentVariable("SECRET_KEY", "Machine")
+    if ($existingKey) {
+        $secretKey = $existingKey
+        Log "    SECRET_KEY já existe como variável do Windows — mantido."
     } else {
-        Log "    .env não encontrado — a iniciar configuração guiada..."
-
-        # Gerar SECRET_KEY via Python stdlib (secrets module, criptograficamente seguro)
         $secretKey = python -c "import secrets, string; chars = string.ascii_letters + string.digits + '!@#%^&*(-_=+)'; print(''.join(secrets.choice(chars) for _ in range(50)))"
+        Log "    SECRET_KEY gerado."
+    }
 
-        Write-Host ""
-        Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
-        Write-Host "   Configuração de Secrets — responde às perguntas abaixo." -ForegroundColor Cyan
-        Write-Host "   Prima ENTER para deixar vazio (pode preencher depois no .env)." -ForegroundColor Gray
-        Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
-        Write-Host ""
+    # Guardar segredos como variáveis do Windows — Machine level (persistentes, todos os processos)
+    [System.Environment]::SetEnvironmentVariable("SECRET_KEY", $secretKey,  "Machine")
+    [System.Environment]::SetEnvironmentVariable("DB_PASS",    $DbPassword, "Machine")
+    if ($emailPass)    { [System.Environment]::SetEnvironmentVariable("EMAIL_HOST_PASSWORD", $emailPass,    "Machine") }
+    if ($celeryBroker) { [System.Environment]::SetEnvironmentVariable("CELERY_BROKER",       $celeryBroker, "Machine") }
+    if ($sentryDsn)    { [System.Environment]::SetEnvironmentVariable("DSN_KEY",              $sentryDsn,    "Machine") }
 
-        Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
-        Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
-        Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
-        $emailPass = Read-Host "        Valor"
+    # Propagar para o processo actual (SetEnvironmentVariable "Machine" não afecta o processo em curso)
+    $env:SECRET_KEY = $secretKey
+    $env:DB_PASS    = $DbPassword
+    if ($emailPass)    { $env:EMAIL_HOST_PASSWORD = $emailPass }
+    if ($celeryBroker) { $env:CELERY_BROKER       = $celeryBroker }
+    if ($sentryDsn)    { $env:DSN_KEY             = $sentryDsn }
 
-        Write-Host ""
-        Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
-        Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
-        Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
-        $prodDomain = Read-Host "        Valor"
+    Log "    ✅ Segredos guardados como variáveis do Windows (Machine level):"
+    Log "       SECRET_KEY, DB_PASS$(if ($emailPass) {', EMAIL_HOST_PASSWORD'})$(if ($celeryBroker) {', CELERY_BROKER'})$(if ($sentryDsn) {', DSN_KEY'})"
 
-        Write-Host ""
-        Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
-        Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
-        $celeryBroker = Read-Host "        Valor"
-
-        Write-Host ""
-        Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
-        Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
-        $sentryDsn = Read-Host "        Valor"
-
-        Write-Host ""
-
-        $envContent = @"
+    # Criar .env mínimo — apenas config não-sensível
+    # load_dotenv() não substitui variáveis do Windows já definidas (override=False por omissão)
+    $envContent = @"
 DEBUG=False
-SECRET_KEY=$secretKey
 DB_ENGINE=postgresql
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=$($cfg.DbName)
 DB_USERNAME=$($cfg.DbUser)
-DB_PASS=$DbPassword
-EMAIL_HOST_PASSWORD=$emailPass
 "@
-        if ($celeryBroker) { $envContent += "`nCELERY_BROKER=$celeryBroker" }
-        if ($sentryDsn)    { $envContent += "`nDSN_KEY=$sentryDsn" }
+    Set-Content $envFile $envContent -Encoding UTF8
+    Log "    .env criado com config não-sensível (sem passwords nem chaves secretas)."
 
-        Set-Content $envFile $envContent -Encoding UTF8
-        icacls $envFile /inheritance:r /grant "SYSTEM:(R)" /grant "Administrators:(R)" | Out-Null
-        Log "    ✅ .env criado e permissoes restritas (apenas SYSTEM e Administrators)."
-
-        if ($prodDomain) {
-            Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
-            Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
-            Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
-        }
-        if (-not $emailPass) {
-            Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
-            Log "       Preencher depois em: $envFile"
-        }
+    if ($prodDomain) {
+        Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
+        Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
+        Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
     }
-} else {
-    Log "    .env já existe — mantido sem alterações."
-    $emailPass  = ""
-    $prodDomain = ""
+    if (-not $emailPass) {
+        Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
+        Log "       Definir depois: [System.Environment]::SetEnvironmentVariable('EMAIL_HOST_PASSWORD','<valor>','Machine')"
+    }
 }
 
 # Verificar placeholders nao substituidos no .env (aplica a .env novo e existente)
@@ -615,9 +629,9 @@ if ($DryRun) {
     $ViewsSql = "$(Split-Path (Split-Path $cfg.BackendDir))\scripts\create_views.sql"
     if (Test-Path $ViewsSql) {
         Log "    A criar/actualizar views PostgreSQL..."
-        $env:PGPASSWORD = $cfg.DbPass
+        $env:PGPASSWORD = $DbPassword
         $ErrorActionPreference = "Continue"
-        & psql -U $cfg.DbUsername -h $cfg.DbHost -p $cfg.DbPort -d $cfg.DbName -f $ViewsSql 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+        & psql -U $cfg.DbUser -h localhost -p 5432 -d $cfg.DbName -f $ViewsSql 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
         $viewsExit = $LASTEXITCODE
         $ErrorActionPreference = "Stop"
         $env:PGPASSWORD = ""
