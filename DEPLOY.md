@@ -172,23 +172,26 @@ Ou, mais simples, activar a **partilha de pasta** na VM:
 3. Em **"Local devices and resources"** → **"More…"** → marcar a **unidade C:** (ou a pasta onde tens o dump)
 4. A unidade fica acessível dentro da VM em `\\tsclient\C\`
 
-**Passo 4 — Instalar os pré-requisitos na VM** (secção 3.2):
+**Passo 4 — Instalar os pré-requisitos na VM:**
 
-Na VM, abrir o PowerShell como Administrador e instalar manualmente:
-- Python 3.11+ (marcar "Add to PATH")
-- Node.js 20 LTS
-- PostgreSQL 16 (anotar a password do `postgres`)
-- Git
-- IIS com httpPlatformHandler e URL Rewrite
+Na VM, abre o **PowerShell como Administrador** e corre:
 
 ```powershell
-# Activar IIS na VM
-Install-WindowsFeature -Name Web-Server, Web-Mgmt-Tools -IncludeManagementTools
+# Git, Python, Node.js, PostgreSQL via winget
+# (usa sempre --source winget para evitar erro de certificado do Microsoft Store)
+winget install --id Git.Git              -e --silent --source winget
+winget install --id Python.Python.3.11   -e --silent --source winget
+winget install --id OpenJS.NodeJS.LTS    -e --silent --source winget
+winget install --id PostgreSQL.PostgreSQL.16 -e --source winget `
+    --override "--mode unattended --superpassword Postgres2026! --servicename postgresql-16"
 
-# Verificar instalações
+# Activar IIS
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer, IIS-ManagementConsole -All
+
+# Fechar e reabrir o PowerShell para actualizar o PATH, depois verificar:
+git --version      # git version 2.x.x
 python --version   # Python 3.11.x
 node --version     # v20.x.x
-git --version      # git version 2.x.x
 psql --version     # psql (PostgreSQL) 16.x
 ```
 
@@ -462,28 +465,67 @@ Precisas de instalar estes programas **antes** de começar os passos abaixo. Tod
 
 **Ao instalar PostgreSQL**, anota a password do superuser `postgres` que defines durante a instalação.
 
+#### Instalação automática via winget (recomendado)
+
+O **winget** (incluído no Windows 11) instala tudo sem descarregar instaladores manualmente. Abre o **PowerShell como Administrador** e corre cada linha:
+
+```powershell
+winget install --id Git.Git              -e --silent --source winget
+winget install --id Python.Python.3.11   -e --silent --source winget
+winget install --id OpenJS.NodeJS.LTS    -e --silent --source winget
+
+# PostgreSQL 16 — substitui "Postgres2026!" pela password que quiseres
+winget install --id PostgreSQL.PostgreSQL.16 -e --source winget `
+    --override "--mode unattended --superpassword Postgres2026! --servicename postgresql-16"
+```
+
+> ⚠️ Usa sempre `--source winget` para evitar o erro `0x8a15005e : The server certificate did not match` que ocorre quando o Microsoft Store não está acessível (comum em VMs e servidores sem GUI).
+
+Após instalar, fecha e reabre o PowerShell para o PATH ser actualizado.
+
+> 💡 O IIS, httpPlatformHandler e URL Rewrite não estão disponíveis no winget — instalar via PowerShell (ver Passo 4 do guia Hyper-V Quick Create abaixo).
+
 ### 3.3 Verificar se o software foi instalado correctamente
 
 Abre o **PowerShell como Administrador** e executa:
 
 ```powershell
-# Verificar Python — deve mostrar "Python 3.11.x"
-python --version
-
-# Verificar Node.js — deve mostrar "v20.x.x"
-node --version
-
-# Verificar npm — deve mostrar "10.x.x"
-npm --version
-
-# Verificar Git — deve mostrar "git version 2.x.x"
-git --version
-
-# Verificar PostgreSQL — deve mostrar o caminho para psql.exe
-Get-Command psql | Select-Object -ExpandProperty Source
+git --version; python --version; node --version; psql --version
 ```
 
-Se algum comando não for reconhecido, o software não foi instalado correctamente ou não foi adicionado ao PATH. Reinstala e garante que a opção "Add to PATH" está marcada.
+Resultado esperado:
+```
+git version 2.x.x
+Python 3.11.x
+vXX.x.x
+psql (PostgreSQL) 16.x
+```
+
+**Se `psql` não for reconhecido** (comum após instalação via winget):
+
+```powershell
+$env:PATH += ";C:\Program Files\PostgreSQL\16\bin"
+psql --version
+```
+
+Para tornar permanente (sem ter de repetir em cada sessão):
+
+```powershell
+[System.Environment]::SetEnvironmentVariable(
+    "PATH",
+    "$env:PATH;C:\Program Files\PostgreSQL\16\bin",
+    [System.EnvironmentVariableTarget]::Machine
+)
+```
+
+**Se `python` mostrar "Python was not found; run without arguments to install from the Microsoft Store"** — é um stub da Store que bloqueia o Python real. Remove-o:
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\Microsoft\WindowsApps\python.exe"  -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:LOCALAPPDATA\Microsoft\WindowsApps\python3.exe" -Force -ErrorAction SilentlyContinue
+# Reinstalar
+winget install --id Python.Python.3.11 -e --source winget
+```
 
 ### 3.4 Requisitos de hardware mínimos
 
@@ -2837,6 +2879,188 @@ Get-Service Redis, CeleryWorker, CeleryBeat, W3SVC | Select-Object Name, Status
 | Responsável pela Aplicação | A DEFINIR | — | Horário laboral |
 | Suporte Windows Server | A DEFINIR | — | Horário laboral |
 | Gestor do Projecto | A DEFINIR | — | Horário laboral |
+
+---
+
+## 17. Configuração de domínios em produção
+
+**Tempo estimado: 30 minutos (mais tempo de propagação DNS)**
+
+> Esta secção cobre o que é necessário para que `https://cartasocial.dgis.gov.cv` (frontend) e `http://backendcartasocial.dgis.gov.cv` (backend) funcionem no servidor de produção (`84.247.171.243`).
+
+---
+
+### 17.1 O que já está configurado no código (não mexer)
+
+As seguintes configurações já existem no repositório e funcionam assim que o deploy estiver feito. Não é necessário alterar nada:
+
+| Ficheiro | Configuração | Domínio/valor |
+|---|---|---|
+| `BackEnd/mfids/core/settings.py` | `ALLOWED_HOSTS` | `backendcartasocial.dgis.gov.cv` |
+| `BackEnd/mfids/core/settings.py` | `CORS_ALLOWED_ORIGINS` | `https://cartasocial.dgis.gov.cv` |
+| `BackEnd/mfids/core/settings.py` | `CSRF_TRUSTED_ORIGINS` | `https://cartasocial.dgis.gov.cv` |
+| `mfids_cs_app/next.config.ts` | CSP `connect-src` | `https://backendcartasocial.dgis.gov.cv` |
+| `mfids_cs_app/next.config.ts` | `BACKEND` array | `https://backendcartasocial.dgis.gov.cv` |
+
+> ⚠️ **Nota sobre CSRF:** A entrada `https://cartasocial.dgis.gov.cv` foi adicionada ao `CSRF_TRUSTED_ORIGINS` no commit `273817c`. Sem esta entrada, todos os formulários (POST/PUT/DELETE) do frontend HTTPS falhariam com erro `403 Forbidden`.
+
+---
+
+### 17.2 Pré-requisito: DNS
+
+Os dois domínios têm de apontar para o IP do servidor **antes** de configurar os bindings IIS e o certificado TLS.
+
+**Registos DNS a criar no painel do registar (delegado à DGIS/operadora):**
+
+| Tipo | Nome | Valor | TTL |
+|------|------|-------|-----|
+| A | `cartasocial.dgis.gov.cv` | `84.247.171.243` | 300 |
+| A | `backendcartasocial.dgis.gov.cv` | `84.247.171.243` | 300 |
+
+**Verificar propagação DNS (correr no servidor ou num terminal externo):**
+
+```powershell
+# No servidor de produção ou em qualquer máquina
+nslookup cartasocial.dgis.gov.cv
+nslookup backendcartasocial.dgis.gov.cv
+# Resultado esperado: 84.247.171.243
+
+# Alternativa: testar resolução a partir dos servidores da Cloudflare
+Resolve-DnsName cartasocial.dgis.gov.cv -Server 1.1.1.1
+Resolve-DnsName backendcartasocial.dgis.gov.cv -Server 1.1.1.1
+```
+
+> ⏱️ A propagação DNS pode demorar entre 5 minutos e 48 horas conforme o TTL anterior e os resolvers dos ISPs. TTL de 300 segundos (5 min) é recomendado para a primeira configuração.
+
+---
+
+### 17.3 IIS — Bindings HTTP por hostname
+
+O `deploy-new.ps1` cria os sites IIS com o IP como binding (`*:4000:` e `*:8000:`). Em produção, é necessário adicionar os bindings por hostname para que o IIS responda aos pedidos via domínio.
+
+**Correr no servidor (como Administrador):**
+
+```powershell
+Import-Module WebAdministration
+
+# ── Frontend: cartasocial.dgis.gov.cv → porta 80 ──────────────────────────
+# Adicionar binding HTTP com hostname (necessário para challenge do Let's Encrypt)
+New-WebBinding `
+    -Name "CartaSocial-App" `
+    -Protocol "http" `
+    -Port 80 `
+    -HostHeader "cartasocial.dgis.gov.cv"
+
+# Verificar
+Get-WebBinding -Name "CartaSocial-App"
+
+# ── Backend: backendcartasocial.dgis.gov.cv → porta 80 ────────────────────
+New-WebBinding `
+    -Name "CartaSocial-API" `
+    -Protocol "http" `
+    -Port 80 `
+    -HostHeader "backendcartasocial.dgis.gov.cv"
+
+# Verificar
+Get-WebBinding -Name "CartaSocial-API"
+```
+
+> 💡 **Porquê porta 80?** Os bindings HTTP na porta 80 são necessários para o challenge HTTP-01 do Let's Encrypt (win-acme). Após instalar o certificado TLS (secção 6), adiciona-se o redirect HTTP→HTTPS e o binding HTTPS na porta 443.
+
+**Abrir as portas no Firewall do Windows (se ainda não estiverem abertas):**
+
+```powershell
+# HTTP (necessário para Let's Encrypt e redirect)
+netsh advfirewall firewall add rule `
+    name="HTTP Producao" dir=in action=allow protocol=TCP localport=80
+
+# HTTPS (após instalar o certificado)
+netsh advfirewall firewall add rule `
+    name="HTTPS Producao" dir=in action=allow protocol=TCP localport=443
+
+# Verificar regras existentes
+netsh advfirewall firewall show rule name=all | Select-String "HTTP|HTTPS|443|80"
+```
+
+---
+
+### 17.4 HTTPS — Instalar certificado TLS
+
+Com os bindings HTTP e o DNS propagado, seguir a **Opção C (Let's Encrypt via win-acme)** documentada na **secção 6** deste guia.
+
+Resumo dos passos:
+1. Verificar que `nslookup cartasocial.dgis.gov.cv` devolve `84.247.171.243`
+2. Verificar que a porta 80 está acessível externamente
+3. Descarregar e correr `wacs.exe` como Administrador
+4. Escolher `Create certificate (full options)` → `Manual input` → hostnomes ambos os domínios
+5. win-acme instala o certificado e configura o binding HTTPS + renovação automática
+
+---
+
+### 17.5 Verificação final pós-configuração
+
+Correr estas verificações depois de configurar DNS, bindings e certificado:
+
+```powershell
+# ── 1. IIS Bindings ─────────────────────────────────────────────────────────
+Get-WebBinding | Format-Table -AutoSize
+# Resultado esperado:
+#   CartaSocial-App  http   80   cartasocial.dgis.gov.cv
+#   CartaSocial-App  https  443  cartasocial.dgis.gov.cv
+#   CartaSocial-API  http   80   backendcartasocial.dgis.gov.cv
+#   CartaSocial-API  https  443  backendcartasocial.dgis.gov.cv  (após TLS)
+
+# ── 2. Certificados instalados ───────────────────────────────────────────────
+Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -like "*dgis.gov.cv*" } |
+    Select-Object Subject, NotAfter, Thumbprint
+
+# ── 3. HTTP → HTTPS redirect funciona ───────────────────────────────────────
+(Invoke-WebRequest "http://cartasocial.dgis.gov.cv" -MaximumRedirection 0 -ErrorAction SilentlyContinue).StatusCode
+# Resultado esperado: 301 ou 302
+
+# ── 4. Backend responde por HTTPS ────────────────────────────────────────────
+(Invoke-WebRequest "https://backendcartasocial.dgis.gov.cv/api/health/").StatusCode
+# Resultado esperado: 200
+
+# ── 5. Frontend responde por HTTPS ───────────────────────────────────────────
+(Invoke-WebRequest "https://cartasocial.dgis.gov.cv/").StatusCode
+# Resultado esperado: 200
+
+# ── 6. CSRF funciona (POST de login) ─────────────────────────────────────────
+# Testar manualmente: abrir https://cartasocial.dgis.gov.cv, tentar login
+# Se der 403 Forbidden → verificar CSRF_TRUSTED_ORIGINS em settings.py
+```
+
+**Checklist de go-live:**
+- [ ] DNS propagado (`nslookup` devolve `84.247.171.243`)
+- [ ] Porta 80 acessível externamente (win-acme consegue fazer o challenge)
+- [ ] Certificado TLS instalado e válido (cadeado verde no browser)
+- [ ] `http://cartasocial.dgis.gov.cv` → redireciona para HTTPS
+- [ ] `https://cartasocial.dgis.gov.cv` → abre o frontend sem avisos
+- [ ] `https://backendcartasocial.dgis.gov.cv/api/docs/` → abre o Swagger
+- [ ] Login no frontend funciona (cookies de sessão com `Secure` flag)
+- [ ] Renovação automática do certificado agendada: `Get-ScheduledTask -TaskPath "\win-acme\"`
+
+---
+
+### 17.6 Arquitetura de domínios — referência rápida
+
+```
+Internet
+    │
+    ▼ DNS: cartasocial.dgis.gov.cv → 84.247.171.243
+    │
+    ├── :443 (HTTPS) → IIS "CartaSocial-App"  → Node.js :4000 (Next.js standalone)
+    │
+    ▼ DNS: backendcartasocial.dgis.gov.cv → 84.247.171.243
+    │
+    └── :443 (HTTPS) → IIS "CartaSocial-API" → Gunicorn :8000 (Django)
+                                                     │
+                                                     ├── PostgreSQL :5432 (só local)
+                                                     └── Redis :6379 (só local)
+```
+
+> 🔒 **Portas internas (PostgreSQL 5432, Redis 6379) nunca expostas externamente** — devem estar bloqueadas no Firewall e no router/ISP.
 
 ---
 
