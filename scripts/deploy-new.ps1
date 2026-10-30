@@ -743,6 +743,9 @@ if ($DryRun) {
     DryStep "npm ci --legacy-peer-deps  (pasta: $($cfg.FrontDir))"
     DryStep "npm run build"
     DryStep "Copy public + .next\static → .next\standalone"
+    DryStep "Copy .env.local → .next\standalone\"
+    DryStep "Gerar .next\standalone\web.config (httpPlatformHandler + node server.js)"
+    DryStep "Criar logs\ em standalone e BackendDir"
 } else {
     Set-Location $cfg.FrontDir
 
@@ -766,6 +769,50 @@ if ($DryRun) {
 
     Copy-Item "$($cfg.FrontDir)\public"       "$($cfg.FrontDir)\.next\standalone\public"       -Recurse -Force
     Copy-Item "$($cfg.FrontDir)\.next\static" "$($cfg.FrontDir)\.next\standalone\.next\static" -Recurse -Force
+
+    # Copiar .env.local para standalone (Next.js server.js lê env vars do seu cwd)
+    $envLocalSrc = "$($cfg.FrontDir)\.env.local"
+    $envLocalDst = "$($cfg.FrontDir)\.next\standalone\.env.local"
+    if (Test-Path $envLocalSrc) {
+        Copy-Item $envLocalSrc $envLocalDst -Force
+        Log "    .env.local copiado para .next\standalone\."
+    } else {
+        Log "    ⚠️  .env.local não encontrado em $envLocalSrc — standalone pode não ter API_URL."
+    }
+
+    # Criar pastas logs (httpPlatformHandler escreve aqui)
+    foreach ($logsDir in @("$($cfg.FrontDir)\.next\standalone\logs", "$($cfg.BackendDir)\logs")) {
+        if (-not (Test-Path $logsDir)) { New-Item $logsDir -ItemType Directory | Out-Null }
+    }
+    Log "    Pastas logs criadas (standalone e backend)."
+
+    # Gerar web.config do frontend para IIS httpPlatformHandler (node server.js)
+    $frontWebConfig = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="httpPlatformHandler" path="*" verb="*"
+           modules="httpPlatformHandler" resourceType="Unspecified" />
+    </handlers>
+    <httpPlatform processPath="node.exe"
+                  arguments="server.js"
+                  startupTimeLimit="60"
+                  requestTimeout="00:04:00"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile="logs\nextjs.log">
+      <environmentVariables>
+        <environmentVariable name="PORT"     value="%HTTP_PLATFORM_PORT%" />
+        <environmentVariable name="HOSTNAME" value="127.0.0.1" />
+        <environmentVariable name="NODE_ENV" value="production" />
+        <environmentVariable name="API_URL"  value="$($cfg.ApiUrl)" />
+      </environmentVariables>
+    </httpPlatform>
+  </system.webServer>
+</configuration>
+"@
+    Set-Content "$($cfg.FrontDir)\.next\standalone\web.config" $frontWebConfig -Encoding UTF8
+    Log "    web.config frontend gerado em .next\standalone\ (httpPlatformHandler + node)."
 
     if (-not (Test-Path "$($cfg.FrontDir)\.next\standalone\server.js")) {
         Abort "Build incompleto: .next\standalone\server.js nao foi gerado. Verificar erros do npm build acima."
@@ -1020,11 +1067,15 @@ if (-not $emailPass -or -not $envHasEmail) {
 } else {
     Log "  1. ✅ EMAIL_HOST_PASSWORD configurado"
 }
-Log "  2. Criar superutilizador Django:"
+Log "  2. Criar superutilizador Django e adicionar ao grupo DGIS:"
+Log "     cd $($cfg.BackendDir)"
 Log "     $($cfg.Python) manage.py createsuperuser"
-Log "  3. Configurar IIS reverse proxy:"
-Log "     - Backend  → porta $($cfg.IIS_API_Port) → gunicorn ou httpPlatformHandler"
-Log "     - Frontend → porta $($cfg.IIS_App_Port) → node server.js (standalone)"
+Log "     $($cfg.Python) manage.py shell -c `"from django.contrib.auth.models import User,Group; u=User.objects.get(username='<USERNAME>'); u.groups.add(Group.objects.get(name='DGIS')); print('OK')`""
+Log "  3. IIS configurado via web.config (httpPlatformHandler):"
+Log "     - Backend  → $($cfg.BackendDir)\web.config  (waitress)"
+Log "     - Frontend → $($cfg.FrontDir)\.next\standalone\web.config  (node)"
+Log "     ⚠️  Módulo IIS httpPlatformHandler necessário — instalar se ausente:"
+Log "       https://www.iis.net/downloads/microsoft/httpplatformhandler"
 Log "  4. ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS — editar em settings.py"
 Log "     BackEnd\mfids\core\settings.py (não são lidos do .env)"
 if ($nssmExe) {

@@ -92,4 +92,5 @@ locale/*/LC_MESSAGES/*.mo
 # Webpack stats
 webpack-stats.json
 
-web.config
+# web.config é versionado — necessário para IIS httpPlatformHandler (waitress)
+!web.config
