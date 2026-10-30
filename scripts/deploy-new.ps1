@@ -457,6 +457,25 @@ if ($DryRun) {
     & $cfg.Python manage.py migrate
     if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
 
+    # Criar tabelas legadas (managed=False) que nao sao criadas pelo migrate
+    # mas que o dump de producao precisa de encontrar para popular.
+    $legacySql = Join-Path $PSScriptRoot "..\scripts\legacy_schema.sql"
+    if (-not (Test-Path $legacySql)) {
+        # Caminho alternativo quando o script esta em scripts/
+        $legacySql = Join-Path $PSScriptRoot "legacy_schema.sql"
+    }
+    if (Test-Path $legacySql) {
+        Log "    A criar tabelas legadas (managed=False)..."
+        $env:PGPASSWORD = $PostgresPassword
+        $ErrorActionPreference = "Continue"
+        psql -U postgres -d $cfg.DbName -f $legacySql
+        $ErrorActionPreference = "Stop"
+        Log "    Tabelas legadas criadas (IF NOT EXISTS)."
+        $env:PGPASSWORD = ""
+    } else {
+        Log "    AVISO: scripts\legacy_schema.sql nao encontrado — tabelas legadas podem estar em falta."
+    }
+
     if ($DumpPath) {
         Log "    A restaurar dump de producao (pode demorar alguns minutos)..."
         Log "    O dump inclui dados criticos que o codigo NAO consegue criar:"

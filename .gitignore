@@ -16,6 +16,7 @@ logs/
 *.zip
 *.sql
 *.sqlite3
+!scripts/legacy_schema.sql
 
 # Claude Code (local)
 .claude/settings.local.json

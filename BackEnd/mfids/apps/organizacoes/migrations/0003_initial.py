@@ -16,6 +16,27 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # Cria tabelas legadas (managed=False) que precisam de existir antes que
+        # UserOrganizacoes adicione FK para organizacao via constraint diferida.
+        migrations.RunSQL(
+            sql="""
+                CREATE TABLE IF NOT EXISTS organizacao (
+                    id               SERIAL      PRIMARY KEY,
+                    nome             VARCHAR(255),
+                    nif              VARCHAR(9),
+                    natureza_juridica VARCHAR(50),
+                    tipo_organizacao VARCHAR(2),
+                    parent_id        INTEGER,
+                    codigo_proprietario VARCHAR(9),
+                    codigo_gestor    VARCHAR(9),
+                    alterado_por     INTEGER,
+                    criado_por       INTEGER,
+                    alter_at         TIMESTAMPTZ,
+                    created_at       TIMESTAMPTZ
+                );
+            """,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.CreateModel(
             name='Contato',
             fields=[
