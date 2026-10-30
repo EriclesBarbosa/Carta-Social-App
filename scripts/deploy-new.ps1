@@ -533,9 +533,22 @@ if ($DryRun) {
         Log "      • dominio            — tipos de equipamento, servico, regime propriedade"
         Log "      • auth_group         — grupos DGIS, Agentes, Proprietario, Gestor, MFIDS"
         Log "      • auth_group_perms   — permissoes por grupo (can_access_frontend, etc.)"
+
+        # Se o dump for um ZIP, extrair primeiro
+        $SqlDumpPath = $DumpPath
+        if ($DumpPath.ToLower().EndsWith('.zip')) {
+            Log "    A extrair dump ZIP..."
+            $ExtractDir = "$env:TEMP\cs_dump_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+            Expand-Archive -Path $DumpPath -DestinationPath $ExtractDir -Force
+            $sqlFiles = Get-ChildItem -Path $ExtractDir -Filter "*.sql" -Recurse
+            if ($sqlFiles.Count -eq 0) { Abort "Nenhum ficheiro .sql encontrado no ZIP '$DumpPath'" }
+            $SqlDumpPath = $sqlFiles[0].FullName
+            Log "    SQL extraido: $SqlDumpPath"
+        }
+
         $env:PGPASSWORD = $PostgresPassword
         $ErrorActionPreference = "Continue"
-        psql -U postgres -d $cfg.DbName -f $DumpPath
+        psql -U postgres -d $cfg.DbName -f $SqlDumpPath
         $ErrorActionPreference = "Stop"
         if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
         Log "    Dump restaurado — geografia, dominios, grupos e permissoes disponiveis."
