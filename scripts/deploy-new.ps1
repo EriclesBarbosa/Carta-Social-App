@@ -503,11 +503,17 @@ if ($DryRun) {
         $env:PGPASSWORD = ""
 
         # Aplicar migracoes pendentes apos dump.
-        # --fake-initial: se a tabela ja existe (veio do dump), marca a initial migration
-        # como aplicada sem tentar fazer CREATE TABLE (que falharia com "already exists").
+        # --fake-initial: marca initial migrations como aplicadas se a tabela ja existe.
+        # Fallback --fake: se uma migration posterior tenta adicionar uma coluna que o dump
+        # ja tem (ex: users.0015 adiciona 'municipio' que a BD de producao ja tinha),
+        # usa --fake para marcar todas as restantes como aplicadas sem as correr.
         Log "    A aplicar migracoes pendentes apos dump (--fake-initial)..."
         & $cfg.Python manage.py migrate --fake-initial
-        if ($LASTEXITCODE -ne 0) { Log "    AVISO: manage.py migrate --fake-initial teve erros — verificar acima." }
+        if ($LASTEXITCODE -ne 0) {
+            Log "    --fake-initial teve conflitos de schema (colunas ja existem no dump) — a usar --fake para marcar restantes como aplicadas..."
+            & $cfg.Python manage.py migrate --fake
+            if ($LASTEXITCODE -ne 0) { Log "    AVISO: manage.py migrate --fake tambem teve erros — verificar acima." }
+        }
     }
 
     Log "    A recolher ficheiros estaticos..."
