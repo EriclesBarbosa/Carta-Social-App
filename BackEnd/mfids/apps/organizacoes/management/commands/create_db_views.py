@@ -238,7 +238,9 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             for name, sql in VIEWS:
                 try:
-                    cursor.execute(sql)
+                    cursor.execute("DROP VIEW IF EXISTS %s" % name)
+                    create_sql = sql.strip().replace("CREATE OR REPLACE VIEW", "CREATE VIEW", 1)
+                    cursor.execute(create_sql)
                     self.stdout.write(self.style.SUCCESS('  OK  %s' % name))
                     ok += 1
                 except Exception as exc:
