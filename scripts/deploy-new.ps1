@@ -490,6 +490,7 @@ if ($DryRun) {
         DryStep "psql -U postgres -d $($cfg.DbName) -f $DumpPath"
     }
     DryStep "python manage.py collectstatic --no-input"
+    DryStep "python manage.py create_db_views"
 } else {
     Set-Location $cfg.BackendDir
     if (-not (Test-Path $cfg.Python)) {
@@ -625,20 +626,13 @@ if ($DryRun) {
         Log "    AVISO: fixtures\groups_permissions.json nao encontrado — grupos NAO aplicados."
     }
 
-    # Criar/actualizar views PostgreSQL (idempotente: usa CREATE OR REPLACE VIEW).
-    $ViewsSql = "$(Split-Path (Split-Path $cfg.BackendDir))\scripts\create_views.sql"
-    if (Test-Path $ViewsSql) {
-        Log "    A criar/actualizar views PostgreSQL..."
-        $env:PGPASSWORD = $DbPassword
-        $ErrorActionPreference = "Continue"
-        & psql -U $cfg.DbUser -h localhost -p 5432 -d $cfg.DbName -f $ViewsSql 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
-        $viewsExit = $LASTEXITCODE
-        $ErrorActionPreference = "Stop"
-        $env:PGPASSWORD = ""
-        if ($viewsExit -ne 0) { Log "    AVISO: create_views.sql teve erros — verificar acima." } else { Log "    Views criadas/actualizadas." }
-    } else {
-        Log "    AVISO: scripts\create_views.sql nao encontrado — views NAO criadas."
-    }
+    # Criar/actualizar as 16 views PostgreSQL via management command (idempotente).
+    Log "    A criar/actualizar views PostgreSQL (16 views)..."
+    $ErrorActionPreference = "Continue"
+    & $cfg.Python manage.py create_db_views 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+    $viewsExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($viewsExit -ne 0) { Log "    AVISO: create_db_views teve erros — verificar acima." } else { Log "    16 views criadas/actualizadas." }
 
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
     $ErrorActionPreference = "Continue"
