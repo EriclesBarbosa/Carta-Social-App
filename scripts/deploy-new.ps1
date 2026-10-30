@@ -632,10 +632,16 @@ if ($DryRun) {
         Log "    .env.local criado com API_URL=$($cfg.ApiUrl)"
     }
 
+    # $ErrorActionPreference = "Continue" necessario: npm/Next.js escrevem para stderr
+    # (avisos, progress) e com "Stop" o pipeline 2>&1 terminaria prematuramente.
+    $ErrorActionPreference = "Continue"
     npm ci --legacy-peer-deps 2>&1 | ForEach-Object { Log "    npm: $_" }
+    $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE -ne 0) { Abort "npm ci falhou" }
 
+    $ErrorActionPreference = "Continue"
     npm run build 2>&1 | ForEach-Object { Log "    build: $_" }
+    $ErrorActionPreference = "Stop"
     if ($LASTEXITCODE -ne 0) { Abort "npm run build falhou" }
 
     Copy-Item "$($cfg.FrontDir)\public"       "$($cfg.FrontDir)\.next\standalone\public"       -Recurse -Force
