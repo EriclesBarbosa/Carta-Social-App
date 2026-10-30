@@ -594,6 +594,11 @@ if ($DryRun) {
         $ErrorActionPreference = "Stop"
         if ($groupCount -eq "0") {
             Log "    auth_group vazio — a aplicar fixture de grupos e permissoes..."
+            # Limpar permissoes existentes (criadas por create_permissions com PKs da sequencia)
+            # para evitar conflito de unique constraint (content_type_id, codename) no loaddata.
+            $ErrorActionPreference = "Continue"
+            & $cfg.Python manage.py shell -c "from django.contrib.auth.models import Permission; Permission.objects.all().delete()" 2>&1 | Out-Null
+            $ErrorActionPreference = "Stop"
             $ErrorActionPreference = "Continue"
             & $cfg.Python manage.py loaddata fixtures/groups_permissions.json 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
             $fixtureExit = $LASTEXITCODE
