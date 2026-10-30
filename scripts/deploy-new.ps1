@@ -490,8 +490,11 @@ if ($DryRun) {
     if ($LASTEXITCODE -ne 0) { Abort "pip install falhou" }
 
     Log "    A aplicar migracoes Django..."
-    & $cfg.Python manage.py migrate 2>&1 | Tee-Object -Append -FilePath $LogFile
-    if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
+    $ErrorActionPreference = "Continue"
+    & $cfg.Python manage.py migrate 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+    $migrateExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($migrateExit -ne 0) { Abort "manage.py migrate falhou" }
 
     # Criar tabelas legadas (managed=False) que nao sao criadas pelo migrate
     # mas que o dump de producao precisa de encontrar para popular.
@@ -561,12 +564,18 @@ if ($DryRun) {
     }
 
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
-    & $cfg.Python manage.py check --deploy 2>&1 | Tee-Object -Append -FilePath $LogFile
-    if ($LASTEXITCODE -ne 0) { Abort "manage.py check --deploy encontrou erros — corrigir antes de continuar (DEBUG=True, ALLOWED_HOSTS, etc.)." }
+    $ErrorActionPreference = "Continue"
+    & $cfg.Python manage.py check --deploy 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+    $checkExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($checkExit -ne 0) { Abort "manage.py check --deploy encontrou erros — corrigir antes de continuar (DEBUG=True, ALLOWED_HOSTS, etc.)." }
 
     Log "    A recolher ficheiros estaticos..."
-    & $cfg.Python manage.py collectstatic --no-input 2>&1 | Tee-Object -Append -FilePath $LogFile
-    if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
+    $ErrorActionPreference = "Continue"
+    & $cfg.Python manage.py collectstatic --no-input 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+    $staticExit = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($staticExit -ne 0) { Abort "collectstatic falhou" }
 }
 
 # ── FASE 6: Verificar dados críticos ──────────────────────────────────────────
