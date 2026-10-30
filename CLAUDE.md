@@ -206,7 +206,7 @@ O campo `Profile.municipio` afecta apenas os dropdowns de geografia (`IlhaList`,
 - Visibilidade de organizações para Agentes: actualmente vêem todas; no futuro filtrar por município do agente
 
 **Atenção estrutural:**
-- As atribuições grupo → permissão estão **apenas na base de dados** (vieram do dump de produção). Não existem em migrations nem fixtures. Se a BD for recriada do zero, é necessário reatribuir as permissões manualmente via Django admin ou exportar um fixture com `python manage.py dumpdata auth.Group auth.Permission --indent 2 > fixtures/groups_permissions.json`.
+- As atribuições grupo → permissão estão em **`BackEnd/mfids/fixtures/groups_permissions.json`** (5 grupos, 163 permissões exportados da BD de produção). O `deploy-new.ps1` aplica este fixture automaticamente via `manage.py loaddata` sempre que `auth_group` ficar vazio após o deploy. Para actualizar o fixture: `python manage.py dumpdata auth.Group auth.Permission --indent 2 --output fixtures/groups_permissions.json`.
 
 ### Permissões relevantes (`apps/shared/permissions.py`)
 

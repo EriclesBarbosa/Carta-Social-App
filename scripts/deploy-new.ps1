@@ -563,6 +563,28 @@ if ($DryRun) {
         }
     }
 
+    # Aplicar fixture de grupos e permissões se auth_group estiver vazio.
+    # O dump de produção inclui estes dados, mas em deploys de teste ou quando
+    # o dump não contém auth_group, o fixture garante que os grupos existem.
+    $fixtureFile = "$($cfg.BackendDir)\fixtures\groups_permissions.json"
+    if (Test-Path $fixtureFile) {
+        $ErrorActionPreference = "Continue"
+        $groupCount = (& $cfg.Python manage.py shell -c "from django.contrib.auth.models import Group; print(Group.objects.count())" 2>$null).Trim()
+        $ErrorActionPreference = "Stop"
+        if ($groupCount -eq "0") {
+            Log "    auth_group vazio — a aplicar fixture de grupos e permissoes..."
+            $ErrorActionPreference = "Continue"
+            & $cfg.Python manage.py loaddata fixtures/groups_permissions.json 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+            $fixtureExit = $LASTEXITCODE
+            $ErrorActionPreference = "Stop"
+            if ($fixtureExit -ne 0) { Log "    AVISO: loaddata falhou — verificar acima." } else { Log "    Grupos e permissoes aplicados via fixture." }
+        } else {
+            Log "    auth_group ja tem $groupCount grupos — fixture ignorado."
+        }
+    } else {
+        Log "    AVISO: fixtures\groups_permissions.json nao encontrado — grupos NAO aplicados."
+    }
+
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
     $ErrorActionPreference = "Continue"
     & $cfg.Python manage.py check --deploy 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
