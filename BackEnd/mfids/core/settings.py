@@ -271,9 +271,7 @@ JAZZMIN_SETTINGS = {
        # {"name": "Support", "url": "https://www.example.com/support", "new_window": True},
     ],
 
-    "usermenu_links": [
-        {"name": "Profile", "url": "auth_user_profile", "icon": "fas fa-user"},
-    ],
+    "usermenu_links": [],
 
     "change_view": {
         "related_modal_active": True,
