@@ -624,7 +624,14 @@ SECRET_KEY=xK!9mPqL3nR@7fVwJ2hA5cBdYeZ#8gTuNs0oI4lE6vXb1WjMy
 
 > 💡 O script `deploy-new.ps1` faz isto automaticamente ao criar o `.env`. Só precisas de executar o comando acima manualmente se criares o `.env` à mão.
 
+> ⛔ **Detecção de placeholders:** O `deploy-new.ps1` lê o `.env` antes de avançar e **aborta com erro** se encontrar qualquer um destes valores:
+> `SUA_SENHA`, `CHANGE_ME`, `YOUR_SECRET`, `PLACEHOLDER`, `INSERT_HERE`, `<PREENCHER>`, `STRONG_PASSWORD`
+>
+> Isto protege contra deploys acidentais com credenciais de exemplo. Todos os valores do `.env` têm de ser reais antes de correr o script.
+
 ### 4.4 Proteger os ficheiros de configuração
+
+> 💡 **`deploy-new.ps1` aplica `icacls` automaticamente** ao criar o `.env`, restringindo acesso a `SYSTEM` e `Administrators` apenas. Os comandos abaixo são para quem criar o `.env` à mão ou quiser afinar as permissões para a conta de serviço `cartasocial_svc`.
 
 Depois de criares o `.env`, restringe as permissões para que só a conta de serviço o possa ler:
 
@@ -1421,6 +1428,11 @@ Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
 - [ ] Pasta `.next/standalone/` gerada
 - [ ] Pastas `public/` e `.next/static/` existem dentro de `standalone/`
 - [ ] Teste local responde HTTP 200
+
+> 💡 **`deploy-new.ps1` concede permissões de escrita ao `IIS_IUSRS` na pasta `.next\cache`** automaticamente após o build. Isto é necessário para que o Next.js possa gerar e actualizar páginas em modo ISR/SSG quando corre sob o IIS. Se fizeres o build manualmente, aplica tu mesmo:
+> ```powershell
+> icacls ".next\cache" /grant "IIS_IUSRS:(OI)(CI)F" /T
+> ```
 
 ---
 
@@ -3129,4 +3141,4 @@ VERIFICAÇÃO DE SAÚDE:
 - *Um deploy major for efectuado*
 - *Um incidente for resolvido com procedimentos novos*
 
-*Versão 4.0 — 2026-10-29*
+*Versão 4.1 — 2026-10-30*
