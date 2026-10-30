@@ -712,7 +712,8 @@ if ($DryRun) {
     $frontOK    = $false
     $frontUrl   = "http://127.0.0.1:$($cfg.IIS_App_Port)/"
     $serverJs   = "$($cfg.FrontDir)\.next\standalone\server.js"
-    $nodeExe    = (Get-Command node -ErrorAction SilentlyContinue)?.Source
+    $nodeCmd    = Get-Command node -ErrorAction SilentlyContinue
+    $nodeExe    = if ($nodeCmd) { $nodeCmd.Source } else { $null }
 
     if ($nodeExe -and (Test-Path $serverJs)) {
         $frontEnv = [System.Collections.Generic.Dictionary[string,string]]::new()

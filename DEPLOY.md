@@ -473,6 +473,7 @@ O **winget** (incluído no Windows 11) instala tudo sem descarregar instaladores
 winget install --id Git.Git              -e --silent --source winget
 winget install --id Python.Python.3.11   -e --silent --source winget
 winget install --id OpenJS.NodeJS.LTS    -e --silent --source winget
+winget install NSSM.NSSM                 --source winget
 
 # PostgreSQL 16 — substitui "Postgres2026!" pela password que quiseres
 winget install --id PostgreSQL.PostgreSQL.16 -e --source winget `
