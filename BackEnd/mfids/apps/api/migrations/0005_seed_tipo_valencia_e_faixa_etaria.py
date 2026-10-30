@@ -50,6 +50,23 @@ FAIXA_ETARIA_MAPPING = [
     ('RS023', 201),   # Cuidador(a) de Infância — 0 a 3 anos
 ]
 
+CREATE_TIPO_VALENCIA = """
+    CREATE TABLE IF NOT EXISTS tipo_valencia (
+        id SERIAL PRIMARY KEY,
+        nome_valencia_social VARCHAR(255),
+        tipo_valencia_social VARCHAR(10),
+        status INTEGER DEFAULT 1
+    );
+"""
+
+CREATE_FAIXA_ETARIA = """
+    CREATE TABLE IF NOT EXISTS resposta_social_faixa_etaria (
+        id SERIAL PRIMARY KEY,
+        tipo_resposta VARCHAR(30),
+        id_dominio INTEGER
+    );
+"""
+
 INSERT_TIPO_VALENCIA = """
     INSERT INTO tipo_valencia (nome_valencia_social, tipo_valencia_social, status)
     VALUES (%s, %s, %s)
@@ -73,6 +90,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunSQL(
+            sql=CREATE_TIPO_VALENCIA + CREATE_FAIXA_ETARIA,
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         migrations.RunSQL(
             sql=[(INSERT_TIPO_VALENCIA, row) for row in TIPO_VALENCIA_DATA]
                 + [(INSERT_FAIXA_ETARIA, row) for row in FAIXA_ETARIA_MAPPING],

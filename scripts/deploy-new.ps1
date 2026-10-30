@@ -1,5 +1,4 @@
-#Requires -RunAsAdministrator
-<#
+﻿<#
 .SYNOPSIS
     Instala a aplicação Carta Social num servidor Windows novo (primeira instalação).
 
@@ -61,8 +60,9 @@ param(
     [string]$AppRoot   = "",
     [Parameter(Mandatory)]
     [string]$DbPassword,
+    [string]$PostgresPassword = "postgres",
     [string]$DumpPath  = "",
-    [string]$RepoUrl   = "https://github.com/dgis-cv/carta-social-app.git",
+    [string]$RepoUrl   = "https://github.com/EriclesBarbosa/Carta-Social-App.git",
     [switch]$DryRun
 )
 
@@ -127,6 +127,18 @@ if (-not $DryRun) {
     New-Item -ItemType Directory -Path $cfg.LogDir -Force | Out-Null
 }
 
+# ── Verificação de privilégios (runtime, não directiva de parser) ─────────────
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    if ($DryRun) {
+        Write-Host "  [DRY RUN] A correr sem privilégios de Administrador (aceitável em modo DryRun)." -ForegroundColor DarkYellow
+    } else {
+        Write-Host "ERRO: Este script requer privilégios de Administrador." -ForegroundColor Red
+        Write-Host "  Abrir PowerShell como Administrador e voltar a correr." -ForegroundColor Gray
+        exit 1
+    }
+}
+
 function Log($msg) {
     $prefix = if ($DryRun) { "[DRY RUN $(Get-Date -Format 'HH:mm:ss')]" } else { "[$(Get-Date -Format 'HH:mm:ss')]" }
     $line   = "$prefix $msg"
@@ -145,9 +157,17 @@ function Abort($msg) {
     exit 1
 }
 
+$_missingCmds = @()
 function Check-Command($cmd) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        Abort "'$cmd' não encontrado. Instala o pré-requisito e volta a correr."
+        if ($DryRun) {
+            Write-Host "  [DRY RUN] ⚠  '$cmd' não encontrado nesta máquina (necessário no servidor alvo)" -ForegroundColor Yellow
+            $script:_missingCmds += $cmd
+        } else {
+            Abort "'$cmd' não encontrado. Instala o pré-requisito e volta a correr."
+        }
+    } else {
+        if ($DryRun) { Write-Host "  [DRY RUN] ✓  '$cmd' encontrado" -ForegroundColor DarkYellow }
     }
 }
 
@@ -207,6 +227,13 @@ if ($freeGB -lt 5) {
 }
 Log "    Disco  : $freeGB GB livres em $drive"
 
+if ($DryRun -and $_missingCmds.Count -gt 0) {
+    Write-Host ""
+    Write-Host "  [DRY RUN] Pré-requisitos em falta nesta máquina: $($_missingCmds -join ', ')" -ForegroundColor Yellow
+    Write-Host "  [DRY RUN] Instalar no servidor alvo antes do deploy real." -ForegroundColor Yellow
+    Write-Host ""
+}
+
 if ($DumpPath -and -not (Test-Path $DumpPath)) {
     Abort "DumpPath '$DumpPath' não existe."
 }
@@ -260,9 +287,11 @@ if ($DryRun) {
     if (Test-Path "$($cfg.AppRoot)\backend\.git") {
         Log "    Repositório já existe — a fazer pull..."
         Set-Location "$($cfg.AppRoot)\backend"
-        git pull origin main 2>&1 | ForEach-Object { Log "    git: $_" }
+        git pull origin main
+        if ($LASTEXITCODE -ne 0) { Abort "git pull falhou" }
     } else {
-        git clone $RepoUrl "$($cfg.AppRoot)\backend" 2>&1 | ForEach-Object { Log "    git: $_" }
+        Log "    A clonar $RepoUrl ..."
+        git clone $RepoUrl "$($cfg.AppRoot)\backend"
         if ($LASTEXITCODE -ne 0) { Abort "git clone falhou" }
     }
     if (-not (Test-Path $cfg.FrontDir)) {
@@ -278,82 +307,95 @@ Log "    DB: $($cfg.DbName)  |  Utilizador: $($cfg.DbUser)"
 if ($DryRun) {
     DryStep "psql -U postgres → CREATE USER $($cfg.DbUser) (password: ***)"
     DryStep "psql -U postgres → CREATE DATABASE $($cfg.DbName) OWNER $($cfg.DbUser)"
-    if ($DumpPath) {
-        Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
-        Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
-        Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
-        Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
-        Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
-        DryStep "psql -U $($cfg.DbUser) -d $($cfg.DbName) -f $DumpPath"
-    }
 } else {
-    $env:PGPASSWORD = "postgres"
+    $env:PGPASSWORD = $PostgresPassword
 
     $createUser = "DO `$`$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '$($cfg.DbUser)') THEN CREATE USER $($cfg.DbUser) WITH PASSWORD '$DbPassword'; END IF; END `$`$;"
-    $createDb   = "SELECT 'CREATE DATABASE ""$($cfg.DbName)"" OWNER $($cfg.DbUser)' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$($cfg.DbName)')\gexec"
 
-    psql -U postgres -c $createUser 2>&1 | ForEach-Object { Log "    pg: $_" }
-    psql -U postgres -c $createDb   2>&1 | ForEach-Object { Log "    pg: $_" }
+    # Usar ficheiros SQL temporários para evitar problemas de quoting do PowerShell
+    # com identificadores PostgreSQL que contêm maiúsculas.
+    $tmpSql = "$env:TEMP\cs_pg_setup.sql"
 
-    if ($DumpPath) {
-        Log "    A restaurar dump de produção (pode demorar alguns minutos)..."
-        Log "    O dump inclui dados críticos que o código NÃO consegue criar:"
-        Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
-        Log "      • dominio            — tipos de equipamento, serviço, regime propriedade"
-        Log "      • auth_group         — grupos DGIS, Agentes, Proprietário, Gestor, MFIDS"
-        Log "      • auth_group_perms   — permissões por grupo (can_access_frontend, etc.)"
-        $env:PGPASSWORD = $DbPassword
-        psql -U $cfg.DbUser -d $cfg.DbName -f $DumpPath 2>&1 | ForEach-Object { Log "    pg: $_" }
-        if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
-        Log "    ✅ Dump restaurado — geografia, domínios, grupos e permissões disponíveis."
-        $env:PGPASSWORD = ""
+    $ErrorActionPreference = "Continue"
+    Set-Content $tmpSql $createUser -Encoding UTF8
+    psql -U postgres -f $tmpSql
+    Remove-Item $tmpSql -Force -ErrorAction SilentlyContinue
+
+    $existingDbName = "$( psql -U postgres -tAc "SELECT datname FROM pg_database WHERE lower(datname)=lower('$($cfg.DbName)')" 2>$null )".Trim()
+    if ($existingDbName) {
+        Log "    Base de dados '$existingDbName' já existe — a remover para instalação limpa..."
+        Set-Content $tmpSql "DROP DATABASE IF EXISTS `"$existingDbName`";" -Encoding UTF8
+        psql -U postgres -f $tmpSql
+        Remove-Item $tmpSql -Force -ErrorAction SilentlyContinue
+        if ($LASTEXITCODE -ne 0) { Abort "DROP DATABASE falhou (pode ter conexões activas — fechar psql/pgAdmin e tentar novamente)" }
     }
+    Set-Content $tmpSql "CREATE DATABASE `"$($cfg.DbName)`" OWNER $($cfg.DbUser);" -Encoding UTF8
+    psql -U postgres -f $tmpSql
+    Remove-Item $tmpSql -Force -ErrorAction SilentlyContinue
+    if ($LASTEXITCODE -ne 0) { Abort "CREATE DATABASE falhou" }
+    Log "    Base de dados '$($cfg.DbName)' criada."
+    $ErrorActionPreference = "Stop"
 }
 
 # ── FASE 4: Configurar .env do backend ────────────────────────────────────────
 Log "==> 4/9  A configurar .env do backend..."
 $envFile = "$($cfg.BackendDir)\.env"
 if (-not (Test-Path $envFile)) {
-    Log "    .env não encontrado — a iniciar configuração guiada..."
+    if ($DryRun) {
+        Log "    .env não existe — em deploy real seria criado com configuração guiada."
+        DryStep "Gerar SECRET_KEY (python secrets module)"
+        DryStep "Perguntar: EMAIL_HOST_PASSWORD, DOMÍNIO, CELERY_BROKER_URL, DSN_KEY"
+        DryStep "Escrever .env em $envFile com:"
+        Write-Host "      DEBUG=False"                                       -ForegroundColor Gray
+        Write-Host "      SECRET_KEY=<gerado automaticamente>"               -ForegroundColor Gray
+        Write-Host "      DB_ENGINE=postgresql"                              -ForegroundColor Gray
+        Write-Host "      DB_HOST=localhost"                                 -ForegroundColor Gray
+        Write-Host "      DB_PORT=5432"                                      -ForegroundColor Gray
+        Write-Host "      DB_NAME=$($cfg.DbName)"                            -ForegroundColor Gray
+        Write-Host "      DB_USERNAME=$($cfg.DbUser)"                        -ForegroundColor Gray
+        Write-Host "      DB_PASS=***"                                       -ForegroundColor Gray
+        Write-Host "      EMAIL_HOST_PASSWORD=<resposta do utilizador>"      -ForegroundColor Gray
+        Write-Host "      CELERY_BROKER=<resposta do utilizador, se fornecida>" -ForegroundColor Gray
+        Write-Host "      DSN_KEY=<resposta do utilizador, se fornecida>"    -ForegroundColor Gray
+        $emailPass  = ""
+        $prodDomain = ""
+    } else {
+        Log "    .env não encontrado — a iniciar configuração guiada..."
 
-    # Gerar SECRET_KEY via Python stdlib (secrets module, criptograficamente seguro)
-    $secretKey = python -c "import secrets, string; chars = string.ascii_letters + string.digits + '!@#%^&*(-_=+)'; print(''.join(secrets.choice(chars) for _ in range(50)))"
+        # Gerar SECRET_KEY via Python stdlib (secrets module, criptograficamente seguro)
+        $secretKey = python -c "import secrets, string; chars = string.ascii_letters + string.digits + '!@#%^&*(-_=+)'; print(''.join(secrets.choice(chars) for _ in range(50)))"
 
-    Write-Host ""
-    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host "   Configuração de Secrets — responde às perguntas abaixo." -ForegroundColor Cyan
-    Write-Host "   Prima ENTER para deixar vazio (pode preencher depois no .env)." -ForegroundColor Gray
-    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host ""
+        Write-Host ""
+        Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host "   Configuração de Secrets — responde às perguntas abaixo." -ForegroundColor Cyan
+        Write-Host "   Prima ENTER para deixar vazio (pode preencher depois no .env)." -ForegroundColor Gray
+        Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+        Write-Host ""
 
-    # EMAIL_HOST_PASSWORD — necessário para reset de password
-    Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
-    Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
-    Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
-    $emailPass = Read-Host "        Valor"
+        Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
+        Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
+        Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
+        $emailPass = Read-Host "        Valor"
 
-    # Domínio de produção — para referência (ALLOWED_HOSTS está em settings.py)
-    Write-Host ""
-    Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
-    Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
-    Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
-    $prodDomain = Read-Host "        Valor"
+        Write-Host ""
+        Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
+        Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
+        Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
+        $prodDomain = Read-Host "        Valor"
 
-    # CELERY_BROKER — Redis broker URL
-    Write-Host ""
-    Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
-    Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
-    $celeryBroker = Read-Host "        Valor"
+        Write-Host ""
+        Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
+        Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
+        $celeryBroker = Read-Host "        Valor"
 
-    # DSN_KEY — Sentry error tracking
-    Write-Host ""
-    Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
-    Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
-    $sentryDsn = Read-Host "        Valor"
+        Write-Host ""
+        Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
+        Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
+        $sentryDsn = Read-Host "        Valor"
 
-    Write-Host ""
+        Write-Host ""
 
-    $envContent = @"
+        $envContent = @"
 DEBUG=False
 SECRET_KEY=$secretKey
 DB_ENGINE=postgresql
@@ -364,38 +406,26 @@ DB_USERNAME=$($cfg.DbUser)
 DB_PASS=$DbPassword
 EMAIL_HOST_PASSWORD=$emailPass
 "@
+        if ($celeryBroker) { $envContent += "`nCELERY_BROKER=$celeryBroker" }
+        if ($sentryDsn)    { $envContent += "`nDSN_KEY=$sentryDsn" }
 
-    if ($celeryBroker) {
-        $envContent += "`nCELERY_BROKER=$celeryBroker"
-    }
-    if ($sentryDsn) {
-        $envContent += "`nDSN_KEY=$sentryDsn"
-    }
-
-    if ($DryRun) {
-        Log "    [DRY RUN] .env NÃO criado. Conteúdo que seria escrito em $envFile`:"
-        $envContent -split "`n" | ForEach-Object {
-            # Mascarar passwords na visualização
-            $masked = $_ -replace '(DB_PASS|EMAIL_HOST_PASSWORD|SECRET_KEY|DSN_KEY)=(.+)', '$1=***'
-            Write-Host "      $_" -ForegroundColor Gray
-        }
-    } else {
         Set-Content $envFile $envContent -Encoding UTF8
         Log "    ✅ .env criado com as variáveis configuradas."
-    }
 
-    # Nota sobre ALLOWED_HOSTS se domínio foi fornecido
-    if ($prodDomain) {
-        Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
-        Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
-        Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
-    }
-    if (-not $emailPass) {
-        Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
-        Log "       Preencher depois em: $envFile"
+        if ($prodDomain) {
+            Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
+            Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
+            Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
+        }
+        if (-not $emailPass) {
+            Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
+            Log "       Preencher depois em: $envFile"
+        }
     }
 } else {
     Log "    .env já existe — mantido sem alterações."
+    $emailPass  = ""
+    $prodDomain = ""
 }
 
 # ── FASE 5: Instalar dependências Python e migrar ─────────────────────────────
@@ -404,24 +434,47 @@ if ($DryRun) {
     DryStep "python -m venv $($cfg.BackendDir)\venv_prod"
     DryStep "pip install -r $($cfg.BackendDir)\requirements.txt"
     DryStep "python manage.py migrate"
+    if ($DumpPath) {
+        Log "    O dump inclui dados criticos que o codigo NAO consegue criar:"
+        Log "      • geografia, dominio, auth_group, auth_group_permissions"
+        DryStep "psql -U postgres -d $($cfg.DbName) -f $DumpPath"
+    }
     DryStep "python manage.py collectstatic --no-input"
 } else {
     Set-Location $cfg.BackendDir
     if (-not (Test-Path $cfg.Python)) {
-        python -m venv venv_prod 2>&1 | ForEach-Object { Log "    venv: $_" }
+        $ErrorActionPreference = "Continue"
+        python -m venv venv_prod
+        $ErrorActionPreference = "Stop"
     } else {
-        Log "    venv_prod já existe."
+        Log "    venv_prod ja existe."
     }
-    & $cfg.Pip install --upgrade pip 2>&1 | Out-Null
-    & $cfg.Pip install -r requirements.txt 2>&1 | ForEach-Object { Log "    pip: $_" }
+    & $cfg.Pip install --upgrade pip | Out-Null
+    & $cfg.Pip install -r requirements.txt
     if ($LASTEXITCODE -ne 0) { Abort "pip install falhou" }
 
-    Log "    A aplicar migrações Django..."
-    & $cfg.Python manage.py migrate 2>&1 | ForEach-Object { Log "    migrate: $_" }
+    Log "    A aplicar migracoes Django..."
+    & $cfg.Python manage.py migrate
     if ($LASTEXITCODE -ne 0) { Abort "manage.py migrate falhou" }
 
-    Log "    A recolher ficheiros estáticos..."
-    & $cfg.Python manage.py collectstatic --no-input 2>&1 | ForEach-Object { Log "    static: $_" }
+    if ($DumpPath) {
+        Log "    A restaurar dump de producao (pode demorar alguns minutos)..."
+        Log "    O dump inclui dados criticos que o codigo NAO consegue criar:"
+        Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
+        Log "      • dominio            — tipos de equipamento, servico, regime propriedade"
+        Log "      • auth_group         — grupos DGIS, Agentes, Proprietario, Gestor, MFIDS"
+        Log "      • auth_group_perms   — permissoes por grupo (can_access_frontend, etc.)"
+        $env:PGPASSWORD = $PostgresPassword
+        $ErrorActionPreference = "Continue"
+        psql -U postgres -d $cfg.DbName -f $DumpPath
+        $ErrorActionPreference = "Stop"
+        if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
+        Log "    Dump restaurado — geografia, dominios, grupos e permissoes disponiveis."
+        $env:PGPASSWORD = ""
+    }
+
+    Log "    A recolher ficheiros estaticos..."
+    & $cfg.Python manage.py collectstatic --no-input
     if ($LASTEXITCODE -ne 0) { Abort "collectstatic falhou" }
 }
 
@@ -638,7 +691,8 @@ if ($dadosCriticosEmFalta) {
     Log ""
 }
 Log " PASSOS MANUAIS RESTANTES:"
-if (-not $emailPass -or -not (Get-Content $envFile -Raw | Select-String 'EMAIL_HOST_PASSWORD=.+')) {
+$envHasEmail = if (Test-Path $envFile) { Get-Content $envFile -Raw | Select-String 'EMAIL_HOST_PASSWORD=.+' } else { $false }
+if (-not $emailPass -or -not $envHasEmail) {
     Log "  1. ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
     Log "     Preencher em: $envFile"
     Log "     Gerar App Password em: Conta Google → Segurança → Passwords de aplicações"
