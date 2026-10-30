@@ -541,7 +541,12 @@ perms = Group.objects.annotate(n=Count('permissions')).filter(n__gt=0).count()
 print(f'{geo},{dom},{grp},{perms}')
 "@
 
-$result = & $cfg.Python -c $pyCheck 2>$null
+$checkFile = "$env:TEMP\cs_phase6_check.py"
+$pyCheck | Set-Content $checkFile -Encoding UTF8
+$ErrorActionPreference = "Continue"
+$result = & $cfg.Python $checkFile 2>$null
+$ErrorActionPreference = "Stop"
+Remove-Item $checkFile -Force -ErrorAction SilentlyContinue
 if ($result -match '^\d+,\d+,\d+,\d+$') {
     $parts       = $result -split ','
     $geoCount    = [int]$parts[0]
