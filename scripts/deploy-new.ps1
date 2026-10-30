@@ -611,6 +611,21 @@ if ($DryRun) {
         Log "    AVISO: fixtures\groups_permissions.json nao encontrado — grupos NAO aplicados."
     }
 
+    # Criar/actualizar views PostgreSQL (idempotente: usa CREATE OR REPLACE VIEW).
+    $ViewsSql = "$(Split-Path (Split-Path $cfg.BackendDir))\scripts\create_views.sql"
+    if (Test-Path $ViewsSql) {
+        Log "    A criar/actualizar views PostgreSQL..."
+        $env:PGPASSWORD = $cfg.DbPass
+        $ErrorActionPreference = "Continue"
+        & psql -U $cfg.DbUsername -h $cfg.DbHost -p $cfg.DbPort -d $cfg.DbName -f $ViewsSql 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+        $viewsExit = $LASTEXITCODE
+        $ErrorActionPreference = "Stop"
+        $env:PGPASSWORD = ""
+        if ($viewsExit -ne 0) { Log "    AVISO: create_views.sql teve erros — verificar acima." } else { Log "    Views criadas/actualizadas." }
+    } else {
+        Log "    AVISO: scripts\create_views.sql nao encontrado — views NAO criadas."
+    }
+
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
     $ErrorActionPreference = "Continue"
     & $cfg.Python manage.py check --deploy 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
