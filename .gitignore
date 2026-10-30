@@ -4,6 +4,7 @@
 !env.sample
 SECRETS.md
 PERMISSOES.md
+secrets.local.ps1
 # Dependências / builds
 node_modules/
 .next/

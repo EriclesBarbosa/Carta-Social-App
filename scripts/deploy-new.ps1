@@ -218,6 +218,29 @@ $nodeVer = node --version 2>&1
 Log "    Python : $pyVer"
 Log "    Node   : $nodeVer"
 
+# Verificar versão mínima Python (>= 3.11)
+if (-not $DryRun) {
+    $pyMatch = [regex]::Match("$pyVer", 'Python (\d+)\.(\d+)')
+    if ($pyMatch.Success) {
+        $pyMajor = [int]$pyMatch.Groups[1].Value
+        $pyMinor = [int]$pyMatch.Groups[2].Value
+        if ($pyMajor -lt 3 -or ($pyMajor -eq 3 -and $pyMinor -lt 11)) {
+            Abort "Python $pyMajor.$pyMinor detectado — é necessário Python 3.11 ou superior."
+        }
+    }
+}
+
+# Verificar versão mínima Node.js (>= 20)
+if (-not $DryRun) {
+    $nodeMatch = [regex]::Match("$nodeVer", 'v(\d+)')
+    if ($nodeMatch.Success) {
+        $nodeMajor = [int]$nodeMatch.Groups[1].Value
+        if ($nodeMajor -lt 20) {
+            Abort "Node.js v$nodeMajor detectado — é necessário Node.js 20 ou superior."
+        }
+    }
+}
+
 # Espaço em disco (mínimo 5 GB para nova instalação)
 $drive  = Split-Path $cfg.AppRoot -Qualifier
 $disk   = Get-PSDrive ($drive.TrimEnd(':'))
@@ -410,7 +433,8 @@ EMAIL_HOST_PASSWORD=$emailPass
         if ($sentryDsn)    { $envContent += "`nDSN_KEY=$sentryDsn" }
 
         Set-Content $envFile $envContent -Encoding UTF8
-        Log "    ✅ .env criado com as variáveis configuradas."
+        icacls $envFile /inheritance:r /grant "SYSTEM:(R)" /grant "Administrators:(R)" | Out-Null
+        Log "    ✅ .env criado e permissoes restritas (apenas SYSTEM e Administrators)."
 
         if ($prodDomain) {
             Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
@@ -426,6 +450,14 @@ EMAIL_HOST_PASSWORD=$emailPass
     Log "    .env já existe — mantido sem alterações."
     $emailPass  = ""
     $prodDomain = ""
+}
+
+# Verificar placeholders nao substituidos no .env (aplica a .env novo e existente)
+if (-not $DryRun -and (Test-Path $envFile)) {
+    $envRaw = Get-Content $envFile -Raw
+    if ($envRaw -match 'SUA_SENHA|CHANGE_ME|YOUR_SECRET|PLACEHOLDER|INSERT_HERE|<PREENCHER>|STRONG_PASSWORD') {
+        Abort "O ficheiro .env contém placeholders nao substituidos. Editar $envFile antes de continuar."
+    }
 }
 
 # ── FASE 5: Instalar dependências Python e migrar ─────────────────────────────
@@ -523,6 +555,10 @@ if ($DryRun) {
             if ($LASTEXITCODE -ne 0) { Log "    AVISO: manage.py migrate --fake tambem teve erros — verificar acima." }
         }
     }
+
+    Log "    A verificar configuracao de producao (manage.py check --deploy)..."
+    & $cfg.Python manage.py check --deploy
+    if ($LASTEXITCODE -ne 0) { Abort "manage.py check --deploy encontrou erros — corrigir antes de continuar (DEBUG=True, ALLOWED_HOSTS, etc.)." }
 
     Log "    A recolher ficheiros estaticos..."
     & $cfg.Python manage.py collectstatic --no-input
@@ -646,6 +682,10 @@ if ($DryRun) {
 
     Copy-Item "$($cfg.FrontDir)\public"       "$($cfg.FrontDir)\.next\standalone\public"       -Recurse -Force
     Copy-Item "$($cfg.FrontDir)\.next\static" "$($cfg.FrontDir)\.next\standalone\.next\static" -Recurse -Force
+
+    if (-not (Test-Path "$($cfg.FrontDir)\.next\standalone\server.js")) {
+        Abort "Build incompleto: .next\standalone\server.js nao foi gerado. Verificar erros do npm build acima."
+    }
     Log "    ✅ Build completo e assets copiados para standalone."
 }
 
