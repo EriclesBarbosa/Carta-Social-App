@@ -563,6 +563,14 @@ if ($DryRun) {
         }
     }
 
+    # Garantir que django_content_type está populado — necessário para loaddata de permissões.
+    # migrate --fake não emite post_migrate se tiver erros, deixando a tabela vazia.
+    # create_contenttypes é idempotente: não cria duplicados se já existirem.
+    Log "    A garantir content types Django (pre-requisito do loaddata)..."
+    $ErrorActionPreference = "Continue"
+    & $cfg.Python manage.py shell -c "from django.contrib.contenttypes.management import create_contenttypes; from django.apps import apps; [create_contenttypes(a, verbosity=0) for a in apps.get_app_configs()]" 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+    $ErrorActionPreference = "Stop"
+
     # Aplicar fixture de grupos e permissões se auth_group estiver vazio.
     # O dump de produção inclui estes dados, mas em deploys de teste ou quando
     # o dump não contém auth_group, o fixture garante que os grupos existem.
