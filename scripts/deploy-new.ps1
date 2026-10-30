@@ -86,6 +86,8 @@ $configs = @{
         DbUser       = "mfids_user"
         ApiUrl       = "http://localhost:8000"
         SmokePort    = 8099
+        CeleryWorker = "CartaSocial-Celery-Worker"
+        CeleryBeat   = "CartaSocial-Celery-Beat"
     }
     staging = @{
         AppRoot      = "C:\apps\cartasocial-staging"
@@ -103,6 +105,8 @@ $configs = @{
         DbUser       = "mfids_user_staging"
         ApiUrl       = "http://localhost:8001"
         SmokePort    = 8098
+        CeleryWorker = "CartaSocial-Celery-Worker-Staging"
+        CeleryBeat   = "CartaSocial-Celery-Beat-Staging"
     }
 }
 
@@ -692,27 +696,46 @@ if ($DryRun) {
 # ── FASE 8: Configurar IIS ────────────────────────────────────────────────────
 Log "==> 8/9  A configurar IIS..."
 if ($DryRun) {
-    DryStep "New-Website '$($cfg.IIS_API)' -Port $($cfg.IIS_API_Port) -PhysicalPath '$($cfg.BackendDir)'"
-    DryStep "New-Website '$($cfg.IIS_App)' -Port $($cfg.IIS_App_Port) -PhysicalPath '$($cfg.FrontDir)\.next\standalone'"
+    DryStep "New-WebAppPool '$($cfg.IIS_API)' (No Managed Code) — AppPool dedicado para API"
+    DryStep "New-WebAppPool '$($cfg.IIS_App)' (No Managed Code) — AppPool dedicado para frontend"
+    DryStep "New-Website '$($cfg.IIS_API)' -Port $($cfg.IIS_API_Port) -ApplicationPool '$($cfg.IIS_API)'"
+    DryStep "New-Website '$($cfg.IIS_App)' -Port $($cfg.IIS_App_Port) -ApplicationPool '$($cfg.IIS_App)'"
 } else {
     Import-Module WebAdministration -ErrorAction SilentlyContinue
 
     if (-not (Get-Module WebAdministration)) {
         Log "⚠️  Módulo WebAdministration não disponível — configuração IIS ignorada."
-        Log "   Configura manualmente os dois sites IIS:"
-        Log "     $($cfg.IIS_API)  → porta $($cfg.IIS_API_Port) → $($cfg.BackendDir)"
-        Log "     $($cfg.IIS_App)  → porta $($cfg.IIS_App_Port) → $($cfg.FrontDir)\.next\standalone"
+        Log "   Configura manualmente os dois sites e AppPools IIS:"
+        Log "     AppPool $($cfg.IIS_API)  → No Managed Code"
+        Log "     AppPool $($cfg.IIS_App)  → No Managed Code"
+        Log "     Site $($cfg.IIS_API)  → porta $($cfg.IIS_API_Port) → $($cfg.BackendDir)"
+        Log "     Site $($cfg.IIS_App)  → porta $($cfg.IIS_App_Port) → $($cfg.FrontDir)\.next\standalone"
     } else {
+        # Application Pools dedicados (evita partilha de processo com Default Web Site)
+        foreach ($poolName in @($cfg.IIS_API, $cfg.IIS_App)) {
+            if (-not (Get-WebAppPoolState -Name $poolName -ErrorAction SilentlyContinue)) {
+                New-WebAppPool -Name $poolName | Out-Null
+                Set-ItemProperty "IIS:\AppPools\$poolName" -Name "managedRuntimeVersion" -Value ""
+                Log "    AppPool '$poolName' criado (No Managed Code)."
+            } else {
+                Log "    AppPool '$poolName' já existe."
+            }
+        }
+
+        # Sites IIS associados a cada AppPool dedicado
         if (-not (Get-Website -Name $cfg.IIS_API -ErrorAction SilentlyContinue)) {
-            New-Website -Name $cfg.IIS_API -Port $cfg.IIS_API_Port -PhysicalPath $cfg.BackendDir -Force
-            Log "    Site $($cfg.IIS_API) criado na porta $($cfg.IIS_API_Port)."
+            New-Website -Name $cfg.IIS_API -Port $cfg.IIS_API_Port `
+                        -PhysicalPath $cfg.BackendDir -ApplicationPool $cfg.IIS_API -Force | Out-Null
+            Log "    Site $($cfg.IIS_API) criado na porta $($cfg.IIS_API_Port) (AppPool: $($cfg.IIS_API))."
         } else {
             Log "    Site $($cfg.IIS_API) já existe."
         }
 
         if (-not (Get-Website -Name $cfg.IIS_App -ErrorAction SilentlyContinue)) {
-            New-Website -Name $cfg.IIS_App -Port $cfg.IIS_App_Port -PhysicalPath "$($cfg.FrontDir)\.next\standalone" -Force
-            Log "    Site $($cfg.IIS_App) criado na porta $($cfg.IIS_App_Port)."
+            New-Website -Name $cfg.IIS_App -Port $cfg.IIS_App_Port `
+                        -PhysicalPath "$($cfg.FrontDir)\.next\standalone" `
+                        -ApplicationPool $cfg.IIS_App -Force | Out-Null
+            Log "    Site $($cfg.IIS_App) criado na porta $($cfg.IIS_App_Port) (AppPool: $($cfg.IIS_App))."
         } else {
             Log "    Site $($cfg.IIS_App) já existe."
         }
@@ -757,6 +780,52 @@ if ($DryRun) {
         Log "⚠️  Django não respondeu após $($maxTries * $interval)s — verificar log acima para erros."
         Log "   A instalação pode ainda funcionar após configurar IIS correctamente."
     }
+}
+
+# ── FASE 9b: Configurar serviços Celery via NSSM ─────────────────────────────
+Log "==> 9b/9  A configurar serviços Celery (NSSM)..."
+$nssmExe = Get-Command nssm -ErrorAction SilentlyContinue
+if ($DryRun) {
+    DryStep "nssm install $($cfg.CeleryWorker) $($cfg.Python) '-m celery -A apps.tasks worker -l info'"
+    DryStep "nssm install $($cfg.CeleryBeat)   $($cfg.Python) '-m celery -A apps.tasks beat -l info'"
+    DryStep "nssm set $($cfg.CeleryWorker) AppDirectory '$($cfg.BackendDir)'"
+    DryStep "nssm set $($cfg.CeleryBeat)   AppDirectory '$($cfg.BackendDir)'"
+    DryStep "Start-Service $($cfg.CeleryWorker); Start-Service $($cfg.CeleryBeat)"
+} elseif (-not $nssmExe) {
+    Log "⚠️  NSSM não encontrado — serviços Celery NÃO configurados."
+    Log "   Instalar NSSM: winget install nssm  ou  https://nssm.cc"
+    Log "   Após instalar, correr manualmente:"
+    Log "     nssm install $($cfg.CeleryWorker) `"$($cfg.Python)`" `"-m celery -A apps.tasks worker -l info`""
+    Log "     nssm set $($cfg.CeleryWorker) AppDirectory `"$($cfg.BackendDir)`""
+    Log "     nssm set $($cfg.CeleryWorker) AppStdout `"$($cfg.LogDir)\celery-worker.log`""
+    Log "     nssm set $($cfg.CeleryWorker) AppStderr `"$($cfg.LogDir)\celery-worker-err.log`""
+    Log "     nssm install $($cfg.CeleryBeat) `"$($cfg.Python)`" `"-m celery -A apps.tasks beat -l info`""
+    Log "     nssm set $($cfg.CeleryBeat) AppDirectory `"$($cfg.BackendDir)`""
+    Log "     nssm set $($cfg.CeleryBeat) AppStdout `"$($cfg.LogDir)\celery-beat.log`""
+    Log "     nssm set $($cfg.CeleryBeat) AppStderr `"$($cfg.LogDir)\celery-beat-err.log`""
+    Log "     Start-Service $($cfg.CeleryWorker); Start-Service $($cfg.CeleryBeat)"
+} else {
+    $ErrorActionPreference = "Continue"
+    foreach ($svc in @(
+        @{ Name = $cfg.CeleryWorker; Args = "-m celery -A apps.tasks worker -l info"; Log = "celery-worker" },
+        @{ Name = $cfg.CeleryBeat;   Args = "-m celery -A apps.tasks beat -l info";   Log = "celery-beat"   }
+    )) {
+        $existing = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
+        if ($existing) {
+            Log "    Serviço $($svc.Name) já existe — a reiniciar..."
+            nssm restart $svc.Name
+        } else {
+            nssm install $svc.Name $cfg.Python $svc.Args
+            nssm set $svc.Name AppDirectory $cfg.BackendDir
+            nssm set $svc.Name AppStdout    "$($cfg.LogDir)\$($svc.Log).log"
+            nssm set $svc.Name AppStderr    "$($cfg.LogDir)\$($svc.Log)-err.log"
+            nssm set $svc.Name Start        SERVICE_AUTO_START
+            Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+            $status = (Get-Service -Name $svc.Name -ErrorAction SilentlyContinue).Status
+            Log "    Serviço $($svc.Name) instalado — estado: $status"
+        }
+    }
+    $ErrorActionPreference = "Stop"
 }
 
 Log "════════════════════════════════════════════════════════"
@@ -810,7 +879,12 @@ Log "     - Backend  → porta $($cfg.IIS_API_Port) → gunicorn ou httpPlatform
 Log "     - Frontend → porta $($cfg.IIS_App_Port) → node server.js (standalone)"
 Log "  4. ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS — editar em settings.py"
 Log "     BackEnd\mfids\core\settings.py (não são lidos do .env)"
-Log "  5. Instalar serviços Windows para Celery (ver docs\celery.md)"
+if ($nssmExe) {
+    Log "  5. ✅ Serviços Celery configurados via NSSM (Fase 9b)"
+} else {
+    Log "  5. ⚠️  NSSM não instalado — serviços Celery pendentes (ver Fase 9b no log)"
+    Log "     Instalar: winget install nssm  e voltar a correr o script"
+}
 Log ""
 Log " Ambiente : $($Ambiente.ToUpper())"
 Log " Log      : $LogFile"
