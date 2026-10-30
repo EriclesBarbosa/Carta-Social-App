@@ -500,6 +500,14 @@ if ($DryRun) {
         $ErrorActionPreference = "Stop"
         if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
         Log "    Dump restaurado — geografia, dominios, grupos e permissoes disponiveis."
+
+        # Dump restaurado como postgres — mfids_user precisa de permissoes nas tabelas legacy.
+        Log "    A conceder permissoes a $($cfg.DbUser) em todas as tabelas..."
+        $ErrorActionPreference = "Continue"
+        psql -U postgres -d $cfg.DbName -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $($cfg.DbUser); GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $($cfg.DbUser);"
+        $ErrorActionPreference = "Stop"
+        Log "    Permissoes concedidas."
+
         $env:PGPASSWORD = ""
 
         # Aplicar migracoes pendentes apos dump.
