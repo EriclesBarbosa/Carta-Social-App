@@ -459,11 +459,7 @@ if ($DryRun) {
 
     # Criar tabelas legadas (managed=False) que nao sao criadas pelo migrate
     # mas que o dump de producao precisa de encontrar para popular.
-    $legacySql = Join-Path $PSScriptRoot "..\scripts\legacy_schema.sql"
-    if (-not (Test-Path $legacySql)) {
-        # Caminho alternativo quando o script esta em scripts/
-        $legacySql = Join-Path $PSScriptRoot "legacy_schema.sql"
-    }
+    $legacySql = "$($cfg.AppRoot)\backend\scripts\legacy_schema.sql"
     if (Test-Path $legacySql) {
         Log "    A criar tabelas legadas (managed=False)..."
         $env:PGPASSWORD = $PostgresPassword
@@ -477,6 +473,21 @@ if ($DryRun) {
     }
 
     if ($DumpPath) {
+        # Limpar tabelas que migrate() ja populou mas que o dump vai repopular.
+        # Sem isto, COPY falha em duplicados (auth_permission, django_content_type, etc.)
+        $preDumpSql = "$($cfg.AppRoot)\backend\scripts\pre_dump_cleanup.sql"
+        if (Test-Path $preDumpSql) {
+            Log "    A limpar tabelas Django antes do dump (evitar duplicados em COPY)..."
+            $env:PGPASSWORD = $PostgresPassword
+            $ErrorActionPreference = "Continue"
+            psql -U postgres -d $cfg.DbName -f $preDumpSql
+            $ErrorActionPreference = "Stop"
+            Log "    Tabelas limpas — pronto para restaurar dump."
+            $env:PGPASSWORD = ""
+        } else {
+            Log "    AVISO: scripts\pre_dump_cleanup.sql nao encontrado — podem ocorrer conflitos no dump."
+        }
+
         Log "    A restaurar dump de producao (pode demorar alguns minutos)..."
         Log "    O dump inclui dados criticos que o codigo NAO consegue criar:"
         Log "      • geografia          — ilhas, concelhos, freguesias, zonas, lugares"
@@ -490,6 +501,13 @@ if ($DryRun) {
         if ($LASTEXITCODE -ne 0) { Abort "Restauro do dump falhou" }
         Log "    Dump restaurado — geografia, dominios, grupos e permissoes disponiveis."
         $env:PGPASSWORD = ""
+
+        # Aplicar migracoes pendentes apos dump.
+        # --fake-initial: se a tabela ja existe (veio do dump), marca a initial migration
+        # como aplicada sem tentar fazer CREATE TABLE (que falharia com "already exists").
+        Log "    A aplicar migracoes pendentes apos dump (--fake-initial)..."
+        & $cfg.Python manage.py migrate --fake-initial
+        if ($LASTEXITCODE -ne 0) { Log "    AVISO: manage.py migrate --fake-initial teve erros — verificar acima." }
     }
 
     Log "    A recolher ficheiros estaticos..."
@@ -511,7 +529,8 @@ $pyCheck = @"
 import django, os, sys
 os.environ.setdefault('DJANGO_SETTINGS_MODULE','core.settings')
 django.setup()
-from apps.organizacoes.models import Geografia, Dominio
+from apps.organizacoes.models import Geografia
+from apps.equipamentos.models import Dominio
 from django.contrib.auth.models import Group, Permission
 from django.db.models import Count
 

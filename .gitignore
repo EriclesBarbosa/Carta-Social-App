@@ -17,6 +17,7 @@ logs/
 *.sql
 *.sqlite3
 !scripts/legacy_schema.sql
+!scripts/pre_dump_cleanup.sql
 
 # Claude Code (local)
 .claude/settings.local.json
