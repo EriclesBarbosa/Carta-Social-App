@@ -690,7 +690,74 @@ if ($DryRun) {
     if (-not (Test-Path "$($cfg.FrontDir)\.next\standalone\server.js")) {
         Abort "Build incompleto: .next\standalone\server.js nao foi gerado. Verificar erros do npm build acima."
     }
+
+    # Garantir permissão de escrita em .next/cache para o processo IIS (ISR/SSG)
+    $cacheDir = "$($cfg.FrontDir)\.next\cache"
+    if (Test-Path $cacheDir) {
+        icacls $cacheDir /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
+        Log "    .next\cache — permissoes de escrita concedidas a IIS_IUSRS."
+    }
+
     Log "    ✅ Build completo e assets copiados para standalone."
+}
+
+# ── FASE 7b: Health check do frontend (smoke test na porta 4000) ─────────────
+Log "==> 7b/9  Health check do frontend Next.js..."
+if ($DryRun) {
+    DryStep "Start-Process node server.js (porta $($cfg.IIS_App_Port))"
+    DryStep "Invoke-WebRequest http://127.0.0.1:$($cfg.IIS_App_Port)/ (8 tentativas × 3s)"
+    Log "    [DRY RUN] Health check ignorado — servidor não foi iniciado."
+} else {
+    $frontProc  = $null
+    $frontOK    = $false
+    $frontUrl   = "http://127.0.0.1:$($cfg.IIS_App_Port)/"
+    $serverJs   = "$($cfg.FrontDir)\.next\standalone\server.js"
+    $nodeExe    = (Get-Command node -ErrorAction SilentlyContinue)?.Source
+
+    if ($nodeExe -and (Test-Path $serverJs)) {
+        $frontEnv = [System.Collections.Generic.Dictionary[string,string]]::new()
+        $frontEnv["PORT"]     = "$($cfg.IIS_App_Port)"
+        $frontEnv["API_URL"]  = $cfg.ApiUrl
+        $frontEnv["NODE_ENV"] = "production"
+
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName  = $nodeExe
+        $psi.Arguments = "`"$serverJs`""
+        $psi.WorkingDirectory = "$($cfg.FrontDir)\.next\standalone"
+        $psi.UseShellExecute  = $false
+        $psi.CreateNoWindow   = $true
+        foreach ($kv in $frontEnv.GetEnumerator()) {
+            $psi.Environment[$kv.Key] = $kv.Value
+        }
+        $frontProc = [System.Diagnostics.Process]::Start($psi)
+        Log "    Servidor frontend a iniciar (PID $($frontProc.Id), porta $($cfg.IIS_App_Port))..."
+
+        $maxTries = 8; $interval = 3
+        for ($i = 1; $i -le $maxTries; $i++) {
+            Start-Sleep -Seconds $interval
+            try {
+                $r = Invoke-WebRequest -Uri $frontUrl -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+                if ($r.StatusCode -in 200, 301, 302) {
+                    Log "✅ Frontend responde: HTTP $($r.StatusCode) (tentativa $i)"
+                    $frontOK = $true; break
+                }
+            } catch {
+                if ($_.Exception.Response) {
+                    $code = [int]$_.Exception.Response.StatusCode
+                    if ($code -in 200, 301, 302) { Log "✅ Frontend: HTTP $code"; $frontOK = $true; break }
+                }
+            }
+        }
+        if ($frontProc -and -not $frontProc.HasExited) {
+            $frontProc | Stop-Process -ErrorAction SilentlyContinue
+        }
+        if (-not $frontOK) {
+            Log "⚠️  Frontend não respondeu após $($maxTries * $interval)s — verificar log acima."
+            Log "   A instalação pode ainda funcionar após configurar IIS correctamente."
+        }
+    } else {
+        Log "⚠️  node.exe ou server.js não encontrado — health check do frontend ignorado."
+    }
 }
 
 # ── FASE 8: Configurar IIS ────────────────────────────────────────────────────
