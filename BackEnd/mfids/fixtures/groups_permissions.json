@@ -44,7 +44,7 @@
   "model": "auth.group",
   "pk": 4,
   "fields": {
-    "name": "Proprietário do Equipamento",
+    "name": "ProprietÃ¡rio do Equipamento",
     "permissions": [
       155,
       160,
@@ -1192,7 +1192,7 @@
   "model": "auth.permission",
   "pk": 125,
   "fields": {
-    "name": "Só consigo ver a organização criada por ele",
+    "name": "SÃ³ consigo ver a organizaÃ§Ã£o criada por ele",
     "content_type": 32,
     "codename": "can_view_only_my_organizacao"
   }
@@ -1318,7 +1318,7 @@
   "model": "auth.permission",
   "pk": 139,
   "fields": {
-    "name": "Can add Organização",
+    "name": "Can add OrganizaÃ§Ã£o",
     "content_type": 32,
     "codename": "add_organizacao"
   }
@@ -1327,7 +1327,7 @@
   "model": "auth.permission",
   "pk": 140,
   "fields": {
-    "name": "Can change Organização",
+    "name": "Can change OrganizaÃ§Ã£o",
     "content_type": 32,
     "codename": "change_organizacao"
   }
@@ -1336,7 +1336,7 @@
   "model": "auth.permission",
   "pk": 141,
   "fields": {
-    "name": "Can delete Organização",
+    "name": "Can delete OrganizaÃ§Ã£o",
     "content_type": 32,
     "codename": "delete_organizacao"
   }
@@ -1345,7 +1345,7 @@
   "model": "auth.permission",
   "pk": 142,
   "fields": {
-    "name": "Can view Organização",
+    "name": "Can view OrganizaÃ§Ã£o",
     "content_type": 32,
     "codename": "view_organizacao"
   }
@@ -1354,7 +1354,7 @@
   "model": "auth.permission",
   "pk": 143,
   "fields": {
-    "name": "Pode gerenciar todas as organizações",
+    "name": "Pode gerenciar todas as organizaÃ§Ãµes",
     "content_type": 32,
     "codename": "gerenciar_organizacao"
   }
@@ -1363,7 +1363,7 @@
   "model": "auth.permission",
   "pk": 144,
   "fields": {
-    "name": "Pode gerar relatórios de organizações",
+    "name": "Pode gerar relatÃ³rios de organizaÃ§Ãµes",
     "content_type": 32,
     "codename": "relatorio_organizacao"
   }
@@ -1372,7 +1372,7 @@
   "model": "auth.permission",
   "pk": 145,
   "fields": {
-    "name": "Pode exportar dados de organizações",
+    "name": "Pode exportar dados de organizaÃ§Ãµes",
     "content_type": 32,
     "codename": "exportar_organizacao"
   }
@@ -1525,7 +1525,7 @@
   "model": "auth.permission",
   "pk": 162,
   "fields": {
-    "name": "Pode alterar todos organização",
+    "name": "Pode alterar todos organizaÃ§Ã£o",
     "content_type": 32,
     "codename": "can_edit_all_organization"
   }
