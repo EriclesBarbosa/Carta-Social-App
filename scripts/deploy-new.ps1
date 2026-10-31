@@ -1250,8 +1250,11 @@ if (-not $emailPass -or -not $envHasEmail) {
 } else {
     Log "  1. ✅ EMAIL_HOST_PASSWORD configurado"
 }
-if ($suUsername) {
-    Log "  2. ✅ Superutilizador '$suUsername' criado e adicionado ao grupo DGIS (ver log acima)."
+if ($suUsername -and $dgisCheck -eq "OK") {
+    Log "  2. ✅ Superutilizador '$suUsername' criado e adicionado ao grupo DGIS."
+} elseif ($suUsername) {
+    Log "  2. ⚠️  Superutilizador '$suUsername' criado mas grupo DGIS NAO associado — corrigir:"
+    Log "       $($cfg.Python) manage.py shell -c `"from django.contrib.auth.models import User,Group; u=User.objects.get(username='$suUsername'); u.groups.set([Group.objects.get(name='DGIS')]); print(list(u.groups.values_list('name',flat=True)))`""
 } else {
     Log "  2. Criar superutilizador Django e adicionar ao grupo DGIS:"
     Log "     cd $($cfg.BackendDir)"
