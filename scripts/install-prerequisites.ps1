@@ -179,7 +179,7 @@ if (-not $SkipIIS) {
     Step "5. IIS -- ignorado (-SkipIIS)"
 }
 
-# -- httpPlatformHandler (nao disponivel no winget) ----------------------------
+# -- httpPlatformHandler (descarregar e instalar automaticamente) --------------
 Step "6. httpPlatformHandler"
 
 $hphPath   = "$env:SystemRoot\system32\inetsrv\HttpPlatformHandler.dll"
@@ -188,21 +188,52 @@ $hphPathV2 = "${env:ProgramFiles}\IIS\HttpPlatformHandlerV2\httpPlatformHandlerV
 if ((Test-Path $hphPath) -or (Test-Path $hphPathV2)) {
     Already "httpPlatformHandler ja instalado."
 } else {
-    Write-Host ""
-    Write-Host "  ============================================================" -ForegroundColor Yellow
-    Write-Host "   httpPlatformHandler NAO esta instalado." -ForegroundColor Yellow
-    Write-Host "   Este modulo e necessario para o IIS correr Node.js e Python." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "   INSTALAR MANUALMENTE:" -ForegroundColor Cyan
-    Write-Host "   1. Abrir no browser:" -ForegroundColor White
-    Write-Host "      https://www.iis.net/downloads/microsoft/httpplatformhandler" -ForegroundColor Cyan
-    Write-Host "   2. Descarregar o instalador (.msi) para x64" -ForegroundColor White
-    Write-Host "   3. Executar o .msi e seguir o assistente" -ForegroundColor White
-    Write-Host "   4. Verificar com:" -ForegroundColor White
-    Write-Host "      Get-WebConfiguration system.webServer/globalModules/*" -ForegroundColor Cyan
-    Write-Host "      (deve aparecer 'httpPlatformHandlerV2' ou 'httpPlatformHandler')" -ForegroundColor Gray
-    Write-Host "  ============================================================" -ForegroundColor Yellow
-    Write-Host ""
+    Say "  A descarregar httpPlatformHandler v1.12 (x64)..." "Gray"
+    $msiUrl  = "https://download.microsoft.com/download/C/F/F/CFF3A0B8-99D4-41A2-AE1A-496C08BEB904/httpPlatformHandler_amd64.msi"
+    $msiPath = "$env:TEMP\httpPlatformHandler_amd64.msi"
+    $downloaded = $false
+    $ErrorActionPreference = "Continue"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing -TimeoutSec 60
+        $downloaded = $true
+    } catch {
+        Warn "Download falhou: $_"
+    }
+    $ErrorActionPreference = "Stop"
+
+    if ($downloaded -and (Test-Path $msiPath)) {
+        Say "  A instalar httpPlatformHandler..." "Gray"
+        $ErrorActionPreference = "Continue"
+        $proc = Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart" -Wait -PassThru
+        $ErrorActionPreference = "Stop"
+        Remove-Item $msiPath -Force -ErrorAction SilentlyContinue
+
+        if ((Test-Path $hphPath) -or (Test-Path $hphPathV2)) {
+            Ok "httpPlatformHandler instalado com sucesso."
+            # Reiniciar IIS para carregar o novo modulo
+            $ErrorActionPreference = "Continue"
+            & "$env:SystemRoot\system32\inetsrv\appcmd.exe" stop APPPOOL /apppool.name:"DefaultAppPool" 2>$null | Out-Null
+            Start-Service W3SVC -ErrorAction SilentlyContinue
+            $ErrorActionPreference = "Stop"
+        } else {
+            Write-Host ""
+            Write-Host "  ============================================================" -ForegroundColor Yellow
+            Write-Host "   Instalacao do MSI concluiu mas o modulo nao foi detectado." -ForegroundColor Yellow
+            Write-Host "   Tentar instalar manualmente:" -ForegroundColor Yellow
+            Write-Host "   https://www.iis.net/downloads/microsoft/httpplatformhandler" -ForegroundColor Cyan
+            Write-Host "  ============================================================" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host ""
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host "   Nao foi possivel descarregar automaticamente." -ForegroundColor Yellow
+        Write-Host "   Instalar manualmente:" -ForegroundColor Yellow
+        Write-Host "   1. Abrir: https://www.iis.net/downloads/microsoft/httpplatformhandler" -ForegroundColor Cyan
+        Write-Host "   2. Descarregar o .msi (x64) e executar" -ForegroundColor White
+        Write-Host "  ============================================================" -ForegroundColor Yellow
+        Write-Host ""
+    }
 }
 
 # -- Resumo final --------------------------------------------------------------
