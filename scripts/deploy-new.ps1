@@ -42,8 +42,9 @@
       - Python 3.11+  (python.org)
       - Node.js 20+   (nodejs.org)
       - PostgreSQL 16 (postgresql.org) — serviço a correr
-      - IIS com módulos: URL Rewrite, Application Request Routing
-      - WebAdministration PowerShell module (vem com IIS)
+      - IIS (Install-WindowsFeature Web-Server,Web-Scripting-Tools)
+      - httpPlatformHandler (https://www.iis.net/downloads/microsoft/httpplatformhandler)
+      - WebAdministration PowerShell module (instalado com Web-Scripting-Tools)
 
     Dados críticos que vêm do dump:
       - Tabela 'geografia'     → dropdowns ilha/concelho/freguesia/zona/lugar
@@ -245,6 +246,46 @@ if (-not $DryRun) {
     }
 }
 
+# Verificar IIS e httpPlatformHandler
+$iisOk  = $false
+$hphOk  = $false
+if (-not $DryRun) {
+    $w3svc = Get-Service -Name W3SVC -ErrorAction SilentlyContinue
+    $iisOk = $w3svc -ne $null
+    if (-not $iisOk) {
+        Write-Host ""
+        Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor Red
+        Write-Host "  ║  IIS não instalado (serviço W3SVC não encontrado).      ║" -ForegroundColor Red
+        Write-Host "  ║  O deploy continua mas os sites IIS NAO serão criados.  ║" -ForegroundColor Red
+        Write-Host "  ║  Instalar IIS antes de usar em produção:                ║" -ForegroundColor Red
+        Write-Host "  ║    Install-WindowsFeature Web-Server,Web-Scripting-Tools║" -ForegroundColor Red
+        Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor Red
+        Write-Host ""
+    } else {
+        Log "    IIS    : W3SVC encontrado."
+        # Verificar httpPlatformHandler (necessário para web.config do backend e frontend)
+        $hphPath = "$env:SystemRoot\system32\inetsrv\HttpPlatformHandler.dll"
+        $hphPathV2 = "${env:ProgramFiles}\IIS\HttpPlatformHandlerV2\httpPlatformHandlerV2.dll"
+        $hphOk = (Test-Path $hphPath) -or (Test-Path $hphPathV2)
+        if (-not $hphOk) {
+            Write-Host ""
+            Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
+            Write-Host "  ║  httpPlatformHandler NAO instalado.                     ║" -ForegroundColor Yellow
+            Write-Host "  ║  O backend (waitress) e frontend (node) NAO arrancam    ║" -ForegroundColor Yellow
+            Write-Host "  ║  via IIS sem este módulo.                               ║" -ForegroundColor Yellow
+            Write-Host "  ║  Descarregar e instalar:                                ║" -ForegroundColor Yellow
+            Write-Host "  ║    https://www.iis.net/downloads/microsoft/             ║" -ForegroundColor Yellow
+            Write-Host "  ║            httpplatformhandler                          ║" -ForegroundColor Yellow
+            Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
+            Write-Host ""
+        } else {
+            Log "    IIS    : httpPlatformHandler encontrado."
+        }
+    }
+} else {
+    Write-Host "  [DRY RUN] IIS: verificar se W3SVC existe e httpPlatformHandler instalado" -ForegroundColor DarkYellow
+}
+
 # Espaço em disco (mínimo 5 GB para nova instalação)
 $drive  = Split-Path $cfg.AppRoot -Qualifier
 $disk   = Get-PSDrive ($drive.TrimEnd(':'))
@@ -375,6 +416,7 @@ if ($DryRun) {
     Log "    Segredos seriam guardados como variáveis de ambiente do Windows (Machine level)."
     DryStep "Gerar SECRET_KEY (python secrets module)"
     DryStep "Perguntar: EMAIL_HOST_PASSWORD, DOMÍNIO, CELERY_BROKER_URL, DSN_KEY"
+    DryStep "Perguntar: superutilizador username, email, password"
     DryStep "[System.Environment]::SetEnvironmentVariable('SECRET_KEY', '...', 'Machine')"
     DryStep "[System.Environment]::SetEnvironmentVariable('DB_PASS', '***', 'Machine')"
     DryStep "Criar .env mínimo (apenas config não-sensível) em $envFile"
@@ -386,6 +428,9 @@ if ($DryRun) {
     Write-Host "      DB_USERNAME=$($cfg.DbUser)"    -ForegroundColor Gray
     $emailPass  = ""
     $prodDomain = ""
+    $suUsername = ""
+    $suEmail    = ""
+    $suPassword = ""
 } else {
     Write-Host ""
     Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
@@ -416,6 +461,25 @@ if ($DryRun) {
     Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
     Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
     $sentryDsn = Read-Host "        Valor"
+
+    Write-Host ""
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "   Superutilizador Django (administrador do sistema)" -ForegroundColor Cyan
+    Write-Host "   Criado automaticamente e adicionado ao grupo DGIS." -ForegroundColor Cyan
+    Write-Host "   Prima ENTER para deixar vazio e criar manualmente depois." -ForegroundColor Gray
+    Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+
+    Write-Host "  [SU-1] Username do superutilizador" -ForegroundColor Yellow
+    $suUsername = Read-Host "         Valor"
+
+    Write-Host ""
+    Write-Host "  [SU-2] Email do superutilizador" -ForegroundColor Yellow
+    $suEmail = Read-Host "         Valor"
+
+    Write-Host ""
+    Write-Host "  [SU-3] Password do superutilizador  (mínimo 8 caracteres)" -ForegroundColor Yellow
+    $suPassword = Read-Host "         Valor"
 
     Write-Host ""
 
@@ -491,6 +555,8 @@ if ($DryRun) {
     }
     DryStep "python manage.py collectstatic --no-input"
     DryStep "python manage.py create_db_views"
+    DryStep "python manage.py createsuperuser --no-input  (se credenciais fornecidas)"
+    DryStep "python manage.py shell → user.groups.add(DGIS)"
 } else {
     Set-Location $cfg.BackendDir
     if (-not (Test-Path $cfg.Python)) {
@@ -633,6 +699,40 @@ if ($DryRun) {
     $viewsExit = $LASTEXITCODE
     $ErrorActionPreference = "Stop"
     if ($viewsExit -ne 0) { Log "    AVISO: create_db_views teve erros — verificar acima." } else { Log "    16 views criadas/actualizadas." }
+
+    # Criar superutilizador e adicionar ao grupo DGIS (se credenciais fornecidas na Fase 4)
+    if ($suUsername -and $suEmail -and $suPassword) {
+        $ErrorActionPreference = "Continue"
+        $existingUser = (& $cfg.Python manage.py shell -c "from django.contrib.auth.models import User; print(User.objects.filter(username='$suUsername').exists())" 2>$null).Trim()
+        $ErrorActionPreference = "Stop"
+        if ($existingUser -eq "True") {
+            Log "    Superutilizador '$suUsername' ja existe — ignorado."
+        } else {
+            Log "    A criar superutilizador '$suUsername'..."
+            $env:DJANGO_SUPERUSER_USERNAME = $suUsername
+            $env:DJANGO_SUPERUSER_EMAIL    = $suEmail
+            $env:DJANGO_SUPERUSER_PASSWORD = $suPassword
+            $ErrorActionPreference = "Continue"
+            & $cfg.Python manage.py createsuperuser --no-input 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+            $suExit = $LASTEXITCODE
+            $ErrorActionPreference = "Stop"
+            $env:DJANGO_SUPERUSER_USERNAME = ""
+            $env:DJANGO_SUPERUSER_EMAIL    = ""
+            $env:DJANGO_SUPERUSER_PASSWORD = ""
+            if ($suExit -ne 0) {
+                Log "    AVISO: createsuperuser falhou — criar manualmente (passo 2 abaixo)."
+            } else {
+                Log "    Superutilizador '$suUsername' criado."
+                $ErrorActionPreference = "Continue"
+                $dgisResult = (& $cfg.Python manage.py shell -c "from django.contrib.auth.models import User,Group; u=User.objects.filter(username='$suUsername').first(); g=Group.objects.filter(name='DGIS').first(); r=u.groups.add(g) if (u and g) else None; print('OK' if (u and g) else 'AVISO')" 2>$null).Trim()
+                $ErrorActionPreference = "Stop"
+                if ($dgisResult -eq "OK") { Log "    Superutilizador adicionado ao grupo DGIS." }
+                else { Log "    AVISO: nao foi possivel adicionar ao grupo DGIS — fazer manualmente." }
+            }
+        }
+    } else {
+        Log "    Credenciais de superutilizador nao fornecidas — criar manualmente (ver passos abaixo)."
+    }
 
     Log "    A verificar configuracao de producao (manage.py check --deploy)..."
     $ErrorActionPreference = "Continue"
@@ -1067,10 +1167,14 @@ if (-not $emailPass -or -not $envHasEmail) {
 } else {
     Log "  1. ✅ EMAIL_HOST_PASSWORD configurado"
 }
-Log "  2. Criar superutilizador Django e adicionar ao grupo DGIS:"
-Log "     cd $($cfg.BackendDir)"
-Log "     $($cfg.Python) manage.py createsuperuser"
-Log "     $($cfg.Python) manage.py shell -c `"from django.contrib.auth.models import User,Group; u=User.objects.get(username='<USERNAME>'); u.groups.add(Group.objects.get(name='DGIS')); print('OK')`""
+if ($suUsername) {
+    Log "  2. ✅ Superutilizador '$suUsername' criado e adicionado ao grupo DGIS (ver log acima)."
+} else {
+    Log "  2. Criar superutilizador Django e adicionar ao grupo DGIS:"
+    Log "     cd $($cfg.BackendDir)"
+    Log "     $($cfg.Python) manage.py createsuperuser"
+    Log "     $($cfg.Python) manage.py shell -c `"from django.contrib.auth.models import User,Group; u=User.objects.get(username='<USERNAME>'); u.groups.add(Group.objects.get(name='DGIS')); print('OK')`""
+}
 Log "  3. IIS configurado via web.config (httpPlatformHandler):"
 Log "     - Backend  → $($cfg.BackendDir)\web.config  (waitress)"
 Log "     - Frontend → $($cfg.FrontDir)\.next\standalone\web.config  (node)"
