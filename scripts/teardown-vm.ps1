@@ -91,7 +91,7 @@ if (-not $KeepDb) {
 }
 Write-Host "   - Directorio: $($cfg.AppRoot)" -ForegroundColor Red
 if (-not $KeepEnvVars) {
-    Write-Host "   - Vars Win  : SECRET_KEY, DB_PASS, ..." -ForegroundColor Red
+    Write-Host "   - Vars Win  : SECRET_KEY, DB_PASS, BACKEND_DOMAIN, FRONTEND_DOMAIN, ..." -ForegroundColor Red
 }
 Write-Host ""
 $confirm = Read-Host "  Confirmar teardown completo? (s/N)"
@@ -200,7 +200,7 @@ $ErrorActionPreference = "Stop"
 if (-not $KeepEnvVars) {
     Step "5/5  A remover variaveis de ambiente Windows (Machine)..."
     $ErrorActionPreference = "Continue"
-    foreach ($varName in @("SECRET_KEY", "DB_PASS", "EMAIL_HOST_PASSWORD", "CELERY_BROKER", "DSN_KEY")) {
+    foreach ($varName in @("SECRET_KEY", "DB_PASS", "EMAIL_HOST_PASSWORD", "CELERY_BROKER", "DSN_KEY", "BACKEND_DOMAIN", "FRONTEND_DOMAIN")) {
         $val = [System.Environment]::GetEnvironmentVariable($varName, "Machine")
         if ($val) {
             [System.Environment]::SetEnvironmentVariable($varName, $null, "Machine")
