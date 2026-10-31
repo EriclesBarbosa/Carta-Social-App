@@ -1097,6 +1097,22 @@ if ($DryRun) {
         # Permissao de escrita nas pastas logs (httpPlatformHandler precisa de criar ficheiros de log)
         icacls "$($cfg.BackendDir)\logs" /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)M" 2>&1 | Out-Null
         icacls "$($cfg.FrontDir)\.next\standalone\logs" /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)M" 2>&1 | Out-Null
+
+        # O venv\Scripts\python.exe e um launcher que precisa de aceder ao Python base.
+        # Se o Python foi instalado no perfil do utilizador (AppData\Local) em vez de
+        # system-wide, o AppPool identity nao tem permissao por omissao.
+        # Ler pyvenv.cfg para descobrir o caminho base e conceder RX.
+        $pyvenvCfg = "$($cfg.BackendDir)\venv_prod\pyvenv.cfg"
+        if (Test-Path $pyvenvCfg) {
+            $homeMatch = Select-String -Path $pyvenvCfg -Pattern '^home\s*=\s*(.+)$'
+            if ($homeMatch) {
+                $pythonBaseDir = $homeMatch.Matches[0].Groups[1].Value.Trim()
+                if ($pythonBaseDir -and (Test-Path $pythonBaseDir)) {
+                    icacls $pythonBaseDir /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)RX" /T 2>&1 | Out-Null
+                    Log "    Permissao RX concedida ao Python base: $pythonBaseDir"
+                }
+            }
+        }
         $ErrorActionPreference = "Stop"
         Log "    Permissoes definidas para 'IIS AppPool\$($cfg.IIS_API)' e 'IIS AppPool\$($cfg.IIS_App)'."
     }
