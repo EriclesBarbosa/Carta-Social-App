@@ -146,13 +146,10 @@ if (-not $SkipIIS) {
         # Windows Server
         $serverFeature = Get-Command Install-WindowsFeature -ErrorAction SilentlyContinue
         if ($serverFeature) {
-            Install-WindowsFeature -Name Web-Server, Web-Scripting-Tools, Web-Common-Http, Web-Static-Content, Web-Http-Errors, Web-Http-Logging -IncludeManagementTools
+            Install-WindowsFeature -Name Web-Server -IncludeManagementTools -IncludeAllSubFeature
         } else {
-            # Windows 10/11
-            Enable-WindowsOptionalFeature -Online -FeatureName `
-                IIS-WebServerRole, IIS-WebServer, IIS-CommonHttpFeatures, IIS-StaticContent, `
-                IIS-HttpErrors, IIS-HttpLogging, IIS-ManagementConsole, IIS-ManagementScriptingTools `
-                -All -NoRestart
+            # Windows 10/11 — IIS-WebServerRole com -All instala todas as dependencias
+            Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All
         }
         $ErrorActionPreference = "Stop"
 
@@ -242,9 +239,13 @@ Write-Host "  ============================================================" -For
 Write-Host "   Instalacao de pre-requisitos concluida." -ForegroundColor Green
 Write-Host ""
 Write-Host "   PROXIMOS PASSOS:" -ForegroundColor Cyan
-Write-Host "   1. Se httpPlatformHandler nao estava instalado:" -ForegroundColor White
-Write-Host "      -> Instalar agora (link acima) e reiniciar o IIS:" -ForegroundColor White
-Write-Host "         iisreset /restart" -ForegroundColor Gray
+Write-Host "   1. Se httpPlatformHandler nao foi instalado automaticamente:" -ForegroundColor White
+Write-Host "      a) Abrir no browser: https://www.iis.net/downloads/microsoft/httpplatformhandler" -ForegroundColor Cyan
+Write-Host "      b) Descarregar o x64 installer (.msi)" -ForegroundColor Gray
+Write-Host "      c) Executar o .msi (instala em cima do IIS existente)" -ForegroundColor Gray
+Write-Host "      d) Reiniciar o IIS: iisreset /restart" -ForegroundColor Gray
+Write-Host "      e) Verificar:" -ForegroundColor Gray
+Write-Host "         Get-WebConfiguration system.webServer/globalModules/* | Where-Object { `$_.name -like '*httpPlatform*' }" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "   2. Fechar e reabrir o PowerShell como Administrador" -ForegroundColor White
 Write-Host "      (para o PATH actualizado ser reconhecido)" -ForegroundColor Gray
