@@ -1154,8 +1154,8 @@ if ($DryRun) {
 } else {
     $ErrorActionPreference = "Continue"
     foreach ($svc in @(
-        @{ Name = $cfg.CeleryWorker; Args = "-m celery -A apps.tasks worker -l info"; Log = "celery-worker" },
-        @{ Name = $cfg.CeleryBeat;   Args = "-m celery -A apps.tasks beat -l info";   Log = "celery-beat"   }
+        @{ Name = $cfg.CeleryWorker; Args = "-m celery -A apps.tasks.celery:app worker -l info"; Log = "celery-worker" },
+        @{ Name = $cfg.CeleryBeat;   Args = "-m celery -A apps.tasks.celery:app beat -l info";   Log = "celery-beat"   }
     )) {
         $existing = Get-Service -Name $svc.Name -ErrorAction SilentlyContinue
         if ($existing) {
@@ -1163,10 +1163,12 @@ if ($DryRun) {
             nssm restart $svc.Name
         } else {
             nssm install $svc.Name $cfg.Python $svc.Args
-            nssm set $svc.Name AppDirectory $cfg.BackendDir
-            nssm set $svc.Name AppStdout    "$($cfg.LogDir)\$($svc.Log).log"
-            nssm set $svc.Name AppStderr    "$($cfg.LogDir)\$($svc.Log)-err.log"
-            nssm set $svc.Name Start        SERVICE_AUTO_START
+            nssm set $svc.Name AppDirectory   $cfg.BackendDir
+            nssm set $svc.Name AppStdout      "$($cfg.LogDir)\$($svc.Log).log"
+            nssm set $svc.Name AppStderr      "$($cfg.LogDir)\$($svc.Log)-err.log"
+            nssm set $svc.Name Start          SERVICE_AUTO_START
+            # DJANGO_SETTINGS_MODULE necessario para o celery.py criar a instancia Celery
+            nssm set $svc.Name AppEnvironmentExtra "DJANGO_SETTINGS_MODULE=core.settings"
             Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
             $status = (Get-Service -Name $svc.Name -ErrorAction SilentlyContinue).Status
             Log "    Serviço $($svc.Name) instalado — estado: $status"
