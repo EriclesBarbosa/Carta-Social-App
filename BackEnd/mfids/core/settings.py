@@ -38,13 +38,22 @@ DEBUG = str2bool(os.environ.get('DEBUG'))
 #print(' DEBUG -> ' + str(DEBUG) ) 
 
 # Hosts Settings
-ALLOWED_HOSTS = [
-    'backendcartasocial.dgis.gov.cv',
-    '84.247.171.243',
-    'localhost',
-    '127.0.0.1',
+_backend_domain  = os.environ.get('BACKEND_DOMAIN', '')
+_frontend_domain = os.environ.get('FRONTEND_DOMAIN', '')
+
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+if _backend_domain:
+    ALLOWED_HOSTS.append(_backend_domain)
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000', 'http://localhost:4000',
+    'http://localhost:3000', 'http://localhost:5085',
+    'http://127.0.0.1:8000', 'http://127.0.0.1:5085',
 ]
-CSRF_TRUSTED_ORIGINS = ['http://localhost:8000','http://localhost:4000','http://backendcartasocial.dgis.gov.cv', 'http://localhost:3000', 'http://localhost:5085', 'http://127.0.0.1:8000', 'http://127.0.0.1:5085', 'https://rocket-django-pro.onrender.com', 'https://cartasocial.dgis.gov.cv']
+if _backend_domain:
+    CSRF_TRUSTED_ORIGINS += [f'https://{_backend_domain}', f'http://{_backend_domain}']
+if _frontend_domain:
+    CSRF_TRUSTED_ORIGINS += [f'https://{_frontend_domain}', f'http://{_frontend_domain}']
 
 # Used by DEBUG-Toolbar 
 INTERNAL_IPS = [
@@ -138,7 +147,9 @@ MIDDLEWARE = [
 ]
 
 ###################################
-CORS_ALLOWED_ORIGINS = ["http://localhost:3000", "https://cartasocial.dgis.gov.cv","http://84.247.171.243", "http://84.247.171.243:4000"]
+CORS_ALLOWED_ORIGINS = ['http://localhost:3000']
+if _frontend_domain:
+    CORS_ALLOWED_ORIGINS += [f'https://{_frontend_domain}', f'http://{_frontend_domain}']
 
 # Allow authentication credentials (cookies, sessions, tokens)
 CORS_ALLOW_CREDENTIALS = True

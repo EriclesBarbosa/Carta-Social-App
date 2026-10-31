@@ -418,7 +418,7 @@ $envFile = "$($cfg.BackendDir)\.env"
 if ($DryRun) {
     Log "    Segredos seriam guardados como variáveis de ambiente do Windows (Machine level)."
     DryStep "Gerar SECRET_KEY (python secrets module)"
-    DryStep "Perguntar: EMAIL_HOST_PASSWORD, DOMÍNIO, CELERY_BROKER_URL, DSN_KEY"
+    DryStep "Perguntar: EMAIL_HOST_PASSWORD, BACKEND_DOMAIN, FRONTEND_DOMAIN, CELERY_BROKER_URL, DSN_KEY"
     DryStep "Perguntar: superutilizador username, email, password"
     DryStep "[System.Environment]::SetEnvironmentVariable('SECRET_KEY', '...', 'Machine')"
     DryStep "[System.Environment]::SetEnvironmentVariable('DB_PASS', '***', 'Machine')"
@@ -429,11 +429,12 @@ if ($DryRun) {
     Write-Host "      DB_PORT=5432"                  -ForegroundColor Gray
     Write-Host "      DB_NAME=$($cfg.DbName)"        -ForegroundColor Gray
     Write-Host "      DB_USERNAME=$($cfg.DbUser)"    -ForegroundColor Gray
-    $emailPass  = ""
-    $prodDomain = ""
-    $suUsername = ""
-    $suEmail    = ""
-    $suPassword = ""
+    $emailPass      = ""
+    $backendDomain  = ""
+    $frontendDomain = ""
+    $suUsername     = ""
+    $suEmail        = ""
+    $suPassword     = ""
 } else {
     Write-Host ""
     Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
@@ -444,24 +445,30 @@ if ($DryRun) {
     Write-Host "  ══════════════════════════════════════════════════════" -ForegroundColor Cyan
     Write-Host ""
 
-    Write-Host "  [1/4] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
+    Write-Host "  [1/5] EMAIL_HOST_PASSWORD" -ForegroundColor Yellow
     Write-Host "        App Password do Gmail (conta mfids.dgis@gmail.com)." -ForegroundColor Gray
     Write-Host "        Gerar em: Conta Google → Segurança → Palavras-passe de aplicações" -ForegroundColor Gray
     $emailPass = Read-Host "        Valor"
 
     Write-Host ""
-    Write-Host "  [2/4] DOMÍNIO DE PRODUÇÃO" -ForegroundColor Yellow
-    Write-Host "        Ex: cartasocial.dgis.gov.cv  ou  84.247.171.243" -ForegroundColor Gray
-    Write-Host "        (Usado para gerar nota sobre ALLOWED_HOSTS e CORS)" -ForegroundColor Gray
-    $prodDomain = Read-Host "        Valor"
+    Write-Host "  [2/5] BACKEND_DOMAIN  (domínio do backend Django)" -ForegroundColor Yellow
+    Write-Host "        Ex: backendcartasocial.dgis.gov.cv" -ForegroundColor Gray
+    Write-Host "        Adicionado automaticamente a ALLOWED_HOSTS e CSRF_TRUSTED_ORIGINS." -ForegroundColor Gray
+    $backendDomain = Read-Host "        Valor"
 
     Write-Host ""
-    Write-Host "  [3/4] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
+    Write-Host "  [3/5] FRONTEND_DOMAIN  (domínio do frontend Next.js)" -ForegroundColor Yellow
+    Write-Host "        Ex: cartasocial.dgis.gov.cv" -ForegroundColor Gray
+    Write-Host "        Adicionado automaticamente a CORS_ALLOWED_ORIGINS e CSRF_TRUSTED_ORIGINS." -ForegroundColor Gray
+    $frontendDomain = Read-Host "        Valor"
+
+    Write-Host ""
+    Write-Host "  [4/5] CELERY_BROKER_URL  (deixar vazio se não usar Celery)" -ForegroundColor Yellow
     Write-Host "        Ex: redis://localhost:6379" -ForegroundColor Gray
     $celeryBroker = Read-Host "        Valor"
 
     Write-Host ""
-    Write-Host "  [4/4] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
+    Write-Host "  [5/5] DSN_KEY do Sentry  (deixar vazio se não usar Sentry)" -ForegroundColor Yellow
     Write-Host "        Ex: https://abc123@o123456.ingest.sentry.io/789" -ForegroundColor Gray
     $sentryDsn = Read-Host "        Valor"
 
@@ -499,19 +506,23 @@ if ($DryRun) {
     # Guardar segredos como variáveis do Windows — Machine level (persistentes, todos os processos)
     [System.Environment]::SetEnvironmentVariable("SECRET_KEY", $secretKey,  "Machine")
     [System.Environment]::SetEnvironmentVariable("DB_PASS",    $DbPassword, "Machine")
-    if ($emailPass)    { [System.Environment]::SetEnvironmentVariable("EMAIL_HOST_PASSWORD", $emailPass,    "Machine") }
-    if ($celeryBroker) { [System.Environment]::SetEnvironmentVariable("CELERY_BROKER",       $celeryBroker, "Machine") }
-    if ($sentryDsn)    { [System.Environment]::SetEnvironmentVariable("DSN_KEY",              $sentryDsn,    "Machine") }
+    if ($emailPass)      { [System.Environment]::SetEnvironmentVariable("EMAIL_HOST_PASSWORD", $emailPass,      "Machine") }
+    if ($backendDomain)  { [System.Environment]::SetEnvironmentVariable("BACKEND_DOMAIN",      $backendDomain,  "Machine") }
+    if ($frontendDomain) { [System.Environment]::SetEnvironmentVariable("FRONTEND_DOMAIN",     $frontendDomain, "Machine") }
+    if ($celeryBroker)   { [System.Environment]::SetEnvironmentVariable("CELERY_BROKER",       $celeryBroker,   "Machine") }
+    if ($sentryDsn)      { [System.Environment]::SetEnvironmentVariable("DSN_KEY",             $sentryDsn,      "Machine") }
 
     # Propagar para o processo actual (SetEnvironmentVariable "Machine" não afecta o processo em curso)
     $env:SECRET_KEY = $secretKey
     $env:DB_PASS    = $DbPassword
-    if ($emailPass)    { $env:EMAIL_HOST_PASSWORD = $emailPass }
-    if ($celeryBroker) { $env:CELERY_BROKER       = $celeryBroker }
-    if ($sentryDsn)    { $env:DSN_KEY             = $sentryDsn }
+    if ($emailPass)      { $env:EMAIL_HOST_PASSWORD = $emailPass }
+    if ($backendDomain)  { $env:BACKEND_DOMAIN      = $backendDomain }
+    if ($frontendDomain) { $env:FRONTEND_DOMAIN     = $frontendDomain }
+    if ($celeryBroker)   { $env:CELERY_BROKER       = $celeryBroker }
+    if ($sentryDsn)      { $env:DSN_KEY             = $sentryDsn }
 
     Log "    ✅ Segredos guardados como variáveis do Windows (Machine level):"
-    Log "       SECRET_KEY, DB_PASS$(if ($emailPass) {', EMAIL_HOST_PASSWORD'})$(if ($celeryBroker) {', CELERY_BROKER'})$(if ($sentryDsn) {', DSN_KEY'})"
+    Log "       SECRET_KEY, DB_PASS$(if ($emailPass) {', EMAIL_HOST_PASSWORD'})$(if ($backendDomain) {', BACKEND_DOMAIN'})$(if ($frontendDomain) {', FRONTEND_DOMAIN'})$(if ($celeryBroker) {', CELERY_BROKER'})$(if ($sentryDsn) {', DSN_KEY'})"
 
     # Criar .env mínimo — apenas config não-sensível
     # load_dotenv() não substitui variáveis do Windows já definidas (override=False por omissão)
@@ -526,10 +537,10 @@ DB_USERNAME=$($cfg.DbUser)
     Set-Content $envFile $envContent -Encoding UTF8
     Log "    .env criado com config não-sensível (sem passwords nem chaves secretas)."
 
-    if ($prodDomain) {
-        Log "    ⚠️  Domínio '$prodDomain' fornecido — adicionar manualmente a:"
-        Log "       BackEnd\mfids\core\settings.py → ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS"
-        Log "       (não são lidos do .env; estão hardcoded no ficheiro)"
+    if ($backendDomain -or $frontendDomain) {
+        Log "    ✅ Domínios guardados como variáveis do Windows (aplicados automaticamente pelo settings.py):"
+        if ($backendDomain)  { Log "       BACKEND_DOMAIN  = $backendDomain  → ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS" }
+        if ($frontendDomain) { Log "       FRONTEND_DOMAIN = $frontendDomain → CORS_ALLOWED_ORIGINS + CSRF_TRUSTED_ORIGINS" }
     }
     if (-not $emailPass) {
         Log "    ⚠️  EMAIL_HOST_PASSWORD vazio — reset de password não vai funcionar."
@@ -1234,8 +1245,16 @@ Log "     - Backend  → $($cfg.BackendDir)\web.config  (waitress)"
 Log "     - Frontend → $($cfg.FrontDir)\.next\standalone\web.config  (node)"
 Log "     ⚠️  Módulo IIS httpPlatformHandler necessário — instalar se ausente:"
 Log "       https://www.iis.net/downloads/microsoft/httpplatformhandler"
-Log "  4. ALLOWED_HOSTS e CORS_ALLOWED_ORIGINS — editar em settings.py"
-Log "     BackEnd\mfids\core\settings.py (não são lidos do .env)"
+if ($backendDomain -or $frontendDomain) {
+    Log "  4. ✅ ALLOWED_HOSTS e CORS configurados via variáveis de ambiente:"
+    if ($backendDomain)  { Log "       BACKEND_DOMAIN  = $backendDomain" }
+    if ($frontendDomain) { Log "       FRONTEND_DOMAIN = $frontendDomain" }
+} else {
+    Log "  4. ⚠️  BACKEND_DOMAIN e FRONTEND_DOMAIN não definidos — ALLOWED_HOSTS e CORS usam só localhost."
+    Log "       Definir quando tiver o domínio:"
+    Log "       [System.Environment]::SetEnvironmentVariable('BACKEND_DOMAIN','backendcartasocial.dgis.gov.cv','Machine')"
+    Log "       [System.Environment]::SetEnvironmentVariable('FRONTEND_DOMAIN','cartasocial.dgis.gov.cv','Machine')"
+}
 if ($nssmExe) {
     Log "  5. ✅ Serviços Celery configurados via NSSM (Fase 9b)"
 } else {
