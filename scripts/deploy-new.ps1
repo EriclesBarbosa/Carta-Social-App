@@ -1088,10 +1088,12 @@ if ($DryRun) {
         }
 
         # Permissoes de leitura/execucao para os AppPool identities (ApplicationPoolIdentity)
-        Log "    A definir permissoes IIS AppPool sobre $($cfg.AppRoot)..."
+        # Limitado as pastas servidas pelo IIS (nao o AppRoot inteiro) para evitar
+        # percorrer node_modules/venv_prod com dezenas de milhares de ficheiros.
+        Log "    A definir permissoes IIS AppPool (BackendDir e standalone)..."
         $ErrorActionPreference = "Continue"
-        icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)RX" /T 2>&1 | Out-Null
-        icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)RX" /T 2>&1 | Out-Null
+        icacls $cfg.BackendDir /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)RX" /T 2>&1 | Out-Null
+        icacls "$($cfg.FrontDir)\.next\standalone" /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)RX" /T 2>&1 | Out-Null
         # Permissao de escrita nas pastas logs (httpPlatformHandler precisa de criar ficheiros de log)
         icacls "$($cfg.BackendDir)\logs" /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)M" 2>&1 | Out-Null
         icacls "$($cfg.FrontDir)\.next\standalone\logs" /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)M" 2>&1 | Out-Null
