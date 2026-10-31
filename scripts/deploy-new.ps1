@@ -727,10 +727,12 @@ if ($DryRun) {
             } else {
                 Log "    Superutilizador '$suUsername' criado."
                 $ErrorActionPreference = "Continue"
-                $dgisResult = (& $cfg.Python manage.py shell -c "from django.contrib.auth.models import User,Group; u=User.objects.filter(username='$suUsername').first(); g=Group.objects.filter(name='DGIS').first(); r=u.groups.add(g) if (u and g) else None; print('OK' if (u and g) else 'AVISO')" 2>$null).Trim()
+                & $cfg.Python manage.py shell -c "from django.contrib.auth.models import User,Group; u=User.objects.get(username='$suUsername'); g=Group.objects.get(name='DGIS'); u.groups.add(g); u.save()" 2>&1 | ForEach-Object { "$_" } | Tee-Object -Append -FilePath $LogFile
+                # Verificar se o grupo foi realmente adicionado (nao confiar so no exit code)
+                $dgisCheck = (& $cfg.Python manage.py shell -c "from django.contrib.auth.models import User; u=User.objects.get(username='$suUsername'); print('OK' if u.groups.filter(name='DGIS').exists() else 'FALHOU')" 2>$null).Trim()
                 $ErrorActionPreference = "Stop"
-                if ($dgisResult -eq "OK") { Log "    Superutilizador adicionado ao grupo DGIS." }
-                else { Log "    AVISO: nao foi possivel adicionar ao grupo DGIS — fazer manualmente." }
+                if ($dgisCheck -eq "OK") { Log "    Superutilizador adicionado ao grupo DGIS." }
+                else { Log "    AVISO: grupo DGIS nao foi associado — adicionar manualmente:" ; Log "      $($cfg.Python) manage.py shell -c `"from django.contrib.auth.models import User,Group; User.objects.get(username='$suUsername').groups.add(Group.objects.get(name='DGIS'))`"" }
             }
         }
     } else {
