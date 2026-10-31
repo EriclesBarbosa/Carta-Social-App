@@ -352,6 +352,9 @@ Copia a pasta `scripts/` para `C:\apps\cartasocial\scripts\` no servidor de prod
 - [11. Monitorização e alertas](#11-monitorização-e-alertas)
 - [12. Segurança em produção](#12-segurança-em-produção)
 - [13. Resolução de problemas (Troubleshooting)](#13-resolução-de-problemas-troubleshooting)
+  - [Problema 1: HTTP 500.19 — configuração bloqueada no IIS](#problema-1-backend-retorna-http-50019--configuration-section-cannot-be-used-at-this-path)
+  - [Problema 2: HTTP 502.3 — httpPlatformHandler não arranca (0x80070002)](#problema-2-backend-retorna-http-5023--bad-gateway-com-código-0x80070002)
+  - [Problema 3: HTTP 502/503 genérico](#problema-3-backend-retorna-http-502-ou-503-genérico)
 - [14. Recuperação de desastres](#14-recuperação-de-desastres)
 - [15. Ambiente de staging (testes)](#15-ambiente-de-staging-testes)
 - [16. Procedimentos operacionais](#16-procedimentos-operacionais)
@@ -2566,23 +2569,93 @@ Set-Location "C:\apps\cartasocial\backend\BackEnd\mfids"
 
 ## 13. Resolução de problemas (Troubleshooting)
 
-### Problema 1: Backend retorna HTTP 502 ou 503
+### Problema 1: Backend retorna HTTP 500.19 — "configuration section cannot be used at this path"
 
-**O que significa:** O IIS não consegue comunicar com o Gunicorn.
+**O que significa:** A secção `<handlers>` do `web.config` está bloqueada globalmente no IIS. Por omissão, o IIS não deixa os sites individuais redefinir os handlers. É necessário desbloquear uma vez por servidor.
+
+**Código de erro típico:** `0x80070021`
+
+```powershell
+# Desbloquear as secções necessárias para o httpPlatformHandler funcionar
+& "$env:SystemRoot\system32\inetsrv\appcmd.exe" unlock config -section:system.webServer/handlers
+& "$env:SystemRoot\system32\inetsrv\appcmd.exe" unlock config -section:system.webServer/modules
+
+# Reiniciar o IIS para aplicar a alteração
+iisreset /restart
+
+# Testar
+Invoke-WebRequest -Uri "http://localhost:8000/api/login/" -UseBasicParsing -TimeoutSec 10
+```
+
+> 💡 **PORQUÊ:** O IIS tem uma hierarquia de configuração (servidor → site → aplicação). Certas secções, como `<handlers>`, estão marcadas como "Deny" por omissão — o site não pode sobrepor-se ao servidor. O comando `appcmd unlock` altera essa regra a nível do servidor. Só precisa de ser feito uma vez.
+
+---
+
+### Problema 2: Backend retorna HTTP 502.3 — "Bad Gateway" com código 0x80070002
+
+**O que significa:** O httpPlatformHandler não consegue iniciar o processo `waitress-serve.exe`. O código `0x80070002` significa "ficheiro não encontrado" — normalmente o `waitress-serve.exe` existe, mas o processo IIS não tem permissão para o executar.
+
+**Causa mais comum:** O Application Pool corre como `ApplicationPoolIdentity` (conta virtual `IIS AppPool\CartaSocial-API`), que por omissão não tem acesso à pasta `C:\apps\cartasocial\`.
+
+> 💡 **PORQUÊ:** O IIS não corre como Administrador — usa contas virtuais com permissões mínimas por segurança. Isso significa que mesmo que o ficheiro exista, o processo IIS pode não ter permissão para o ler ou executar.
+
+**Passo 1 — Confirmar que o `waitress-serve.exe` existe:**
+
+```powershell
+Test-Path "C:\apps\cartasocial\backend\BackEnd\mfids\venv_prod\Scripts\waitress-serve.exe"
+# Deve retornar: True
+```
+
+**Passo 2 — Testar waitress directamente (como Administrador):**
+
+```powershell
+Set-Location "C:\apps\cartasocial\backend\BackEnd\mfids"
+.\venv_prod\Scripts\waitress-serve.exe --listen=127.0.0.1:9999 core.wsgi:application
+# Se mostrar "Serving on http://127.0.0.1:9999" — waitress funciona, o problema é permissões
+# Ctrl+C para parar
+```
+
+**Passo 3 — Conceder permissões ao AppPool identity:**
+
+```powershell
+# (OI)(CI)RX = leitura + execução, herdado por subpastas e ficheiros
+icacls "C:\apps\cartasocial" /grant "IIS AppPool\CartaSocial-API:(OI)(CI)RX" /T
+icacls "C:\apps\cartasocial" /grant "IIS AppPool\CartaSocial-App:(OI)(CI)RX" /T
+
+# Reiniciar AppPools e testar
+Restart-WebAppPool -Name "CartaSocial-API"
+Restart-WebAppPool -Name "CartaSocial-App"
+Start-Sleep -Seconds 3
+Invoke-WebRequest -Uri "http://localhost:8000/api/login/" -UseBasicParsing -TimeoutSec 10
+```
+
+> ✅ **Nota:** O `deploy-new.ps1` aplica estas permissões automaticamente na Fase 8. Este passo só é necessário se o deploy falhou antes dessa fase, ou se a pasta foi criada manualmente.
+
+**Passo 4 — Ver o log do waitress para erros de arranque:**
+
+```powershell
+Get-Content "C:\apps\cartasocial\backend\BackEnd\mfids\logs\waitress.log" -Tail 30
+```
+
+---
+
+### Problema 3: Backend retorna HTTP 502 ou 503 (genérico)
+
+**O que significa:** O IIS não consegue comunicar com o waitress.
 
 ```powershell
 # 1. Verificar se o Application Pool está a correr
 Import-Module WebAdministration
-(Get-WebConfiguration "system.applicationHost/applicationPools/add[@name='CartaSocial-API']").state
+Get-WebAppPoolState -Name "CartaSocial-API"
 # Esperado: "Started"
 
-# 2. Ver os últimos erros do Gunicorn
-Get-Content "C:\apps\cartasocial\logs\backend\gunicorn.log" -Tail 50
+# 2. Ver os últimos erros do waitress
+Get-Content "C:\apps\cartasocial\backend\BackEnd\mfids\logs\waitress.log" -Tail 50
 
-# 3. Testar se o Python consegue iniciar o Gunicorn manualmente
+# 3. Testar se o waitress arranca manualmente
 Set-Location "C:\apps\cartasocial\backend\BackEnd\mfids"
-.\venv_prod\Scripts\python.exe -m gunicorn --config gunicorn-cfg.py core.wsgi:application
-# Se der erro aqui, o problema está no código ou na configuração
+.\venv_prod\Scripts\waitress-serve.exe --listen=127.0.0.1:9999 core.wsgi:application
+# Se der erro aqui, o problema está no código ou na configuração Django
 
 # 4. Verificar se o .env está correcto
 Get-Content .env
@@ -2590,10 +2663,10 @@ Get-Content .env
 # 5. Reiniciar apenas o Application Pool do backend
 Restart-WebAppPool "CartaSocial-API"
 Start-Sleep -Seconds 5
-Invoke-WebRequest -Uri "http://localhost:8000/api/docs/" -UseBasicParsing
+Invoke-WebRequest -Uri "http://localhost:8000/api/login/" -UseBasicParsing -TimeoutSec 10
 ```
 
-### Problema 2: Frontend mostra página em branco ou erro
+### Problema 4: Frontend mostra página em branco ou erro
 
 ```powershell
 # 1. Ver os logs do processo Node.js
@@ -2616,7 +2689,7 @@ node server.js
 # Abre http://localhost:4000 no browser para ver o erro exacto
 ```
 
-### Problema 3: Celery não processa tarefas
+### Problema 5: Celery não processa tarefas
 
 ```powershell
 # 1. Verificar se os serviços estão a correr
@@ -2646,7 +2719,7 @@ Restart-Service CeleryWorker
 Restart-Service CeleryBeat
 ```
 
-### Problema 4: Erro de ligação à base de dados
+### Problema 6: Erro de ligação à base de dados
 
 ```powershell
 # 1. Verificar se o PostgreSQL está a correr
@@ -2670,7 +2743,7 @@ Get-ChildItem $logDir | Sort-Object LastWriteTime -Descending |
 Restart-Service postgresql-x64-16
 ```
 
-### Problema 5: Página de erro do Django em vez da aplicação
+### Problema 7: Página de erro do Django em vez da aplicação
 
 Se aparecer o ecrã de erro laranja/amarelo do Django com traceback, significa que `DEBUG=True` no `.env`. Em produção, isto não deve acontecer:
 
@@ -2687,7 +2760,7 @@ Get-Content "C:\apps\cartasocial\backend\BackEnd\mfids\.env" |
 Restart-WebAppPool "CartaSocial-API"
 ```
 
-### Problema 6: "This site can't be reached" no browser
+### Problema 8: "This site can't be reached" no browser
 
 ```powershell
 # 1. Verificar se os sites IIS estão iniciados
