@@ -112,7 +112,7 @@ if (Get-Module WebAdministration) {
         } else {
             Warn "Site '$siteName' nao encontrado -- ignorado."
         }
-        $pool = Get-WebAppPool -Name $siteName -ErrorAction SilentlyContinue
+        $pool = Get-Item "IIS:\AppPools\$siteName" -ErrorAction SilentlyContinue
         if ($pool) {
             Stop-WebAppPool   -Name $siteName -ErrorAction SilentlyContinue
             Remove-WebAppPool -Name $siteName -ErrorAction SilentlyContinue

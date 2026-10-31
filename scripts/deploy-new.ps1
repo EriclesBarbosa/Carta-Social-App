@@ -1011,7 +1011,7 @@ if ($DryRun) {
     } else {
         # Application Pools dedicados (evita partilha de processo com Default Web Site)
         foreach ($poolName in @($cfg.IIS_API, $cfg.IIS_App)) {
-            if (-not (Get-WebAppPool -Name $poolName -ErrorAction SilentlyContinue)) {
+            if (-not (Test-Path "IIS:\AppPools\$poolName")) {
                 New-WebAppPool -Name $poolName | Out-Null
                 Set-ItemProperty "IIS:\AppPools\$poolName" -Name "managedRuntimeVersion" -Value ""
                 Log "    AppPool '$poolName' criado (No Managed Code)."
