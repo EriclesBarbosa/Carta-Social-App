@@ -56,8 +56,8 @@ const CSP = [
   // All other fetch destinations default to same origin
   `default-src 'self'`,
 
-  // Upgrade insecure requests on production
-  `upgrade-insecure-requests`,
+  // upgrade-insecure-requests omitido: só faz sentido com HTTPS activo.
+  // Activar quando o site tiver certificado SSL configurado no IIS/proxy.
 ].join("; ");
 
 const securityHeaders = [
@@ -86,10 +86,8 @@ const securityHeaders = [
     key: "X-DNS-Prefetch-Control",
     value: "on",
   },
-  {
-    key: "Strict-Transport-Security",
-    value: "max-age=63072000; includeSubDomains; preload",
-  },
+  // Strict-Transport-Security omitido: só deve ser enviado sobre HTTPS.
+  // Activar quando o site tiver certificado SSL configurado no IIS/proxy.
 ];
 
 const nextConfig: NextConfig = {
