@@ -254,34 +254,37 @@ if (-not $DryRun) {
     $iisOk = $w3svc -ne $null
     if (-not $iisOk) {
         Write-Host ""
-        Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor Red
-        Write-Host "  ║  IIS não instalado (serviço W3SVC não encontrado).      ║" -ForegroundColor Red
-        Write-Host "  ║  O deploy continua mas os sites IIS NAO serão criados.  ║" -ForegroundColor Red
-        Write-Host "  ║  Instalar IIS antes de usar em produção:                ║" -ForegroundColor Red
-        Write-Host "  ║    Install-WindowsFeature Web-Server,Web-Scripting-Tools║" -ForegroundColor Red
-        Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor Red
+        Write-Host "  ERRO: IIS nao instalado (servico W3SVC nao encontrado)." -ForegroundColor Red
+        Write-Host "  O deploy-new.ps1 requer IIS para criar os sites da aplicacao." -ForegroundColor Red
         Write-Host ""
-    } else {
-        Log "    IIS    : W3SVC encontrado."
-        # Verificar httpPlatformHandler (necessário para web.config do backend e frontend)
-        $hphPath = "$env:SystemRoot\system32\inetsrv\HttpPlatformHandler.dll"
-        $hphPathV2 = "${env:ProgramFiles}\IIS\HttpPlatformHandlerV2\httpPlatformHandlerV2.dll"
-        $hphOk = (Test-Path $hphPath) -or (Test-Path $hphPathV2)
-        if (-not $hphOk) {
-            Write-Host ""
-            Write-Host "  ╔══════════════════════════════════════════════════════════╗" -ForegroundColor Yellow
-            Write-Host "  ║  httpPlatformHandler NAO instalado.                     ║" -ForegroundColor Yellow
-            Write-Host "  ║  O backend (waitress) e frontend (node) NAO arrancam    ║" -ForegroundColor Yellow
-            Write-Host "  ║  via IIS sem este módulo.                               ║" -ForegroundColor Yellow
-            Write-Host "  ║  Descarregar e instalar:                                ║" -ForegroundColor Yellow
-            Write-Host "  ║    https://www.iis.net/downloads/microsoft/             ║" -ForegroundColor Yellow
-            Write-Host "  ║            httpplatformhandler                          ║" -ForegroundColor Yellow
-            Write-Host "  ╚══════════════════════════════════════════════════════════╝" -ForegroundColor Yellow
-            Write-Host ""
-        } else {
-            Log "    IIS    : httpPlatformHandler encontrado."
-        }
+        Write-Host "  Instalar pre-requisitos primeiro:" -ForegroundColor Yellow
+        Write-Host "    .\scripts\install-prerequisites.ps1" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  Ou instalar apenas o IIS manualmente:" -ForegroundColor Yellow
+        Write-Host "    (Windows Server) Install-WindowsFeature Web-Server,Web-Scripting-Tools" -ForegroundColor Gray
+        Write-Host "    (Windows 10/11)  Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole,IIS-ManagementScriptingTools -All" -ForegroundColor Gray
+        Write-Host ""
+        Abort "IIS nao instalado. Correr install-prerequisites.ps1 primeiro."
     }
+    Log "    IIS    : W3SVC encontrado."
+
+    # Verificar httpPlatformHandler (necessario para web.config do backend e frontend)
+    $hphPath   = "$env:SystemRoot\system32\inetsrv\HttpPlatformHandler.dll"
+    $hphPathV2 = "${env:ProgramFiles}\IIS\HttpPlatformHandlerV2\httpPlatformHandlerV2.dll"
+    $hphOk     = (Test-Path $hphPath) -or (Test-Path $hphPathV2)
+    if (-not $hphOk) {
+        Write-Host ""
+        Write-Host "  ERRO: httpPlatformHandler nao instalado." -ForegroundColor Red
+        Write-Host "  O backend (waitress) e o frontend (node) nao arrancam via IIS sem este modulo." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Instalar:" -ForegroundColor Yellow
+        Write-Host "    1. Abrir: https://www.iis.net/downloads/microsoft/httpplatformhandler" -ForegroundColor Cyan
+        Write-Host "    2. Descarregar e executar o .msi (x64)" -ForegroundColor Gray
+        Write-Host "    3. Voltar a correr este script" -ForegroundColor Gray
+        Write-Host ""
+        Abort "httpPlatformHandler nao instalado. Ver instrucoes acima."
+    }
+    Log "    IIS    : httpPlatformHandler encontrado."
 } else {
     Write-Host "  [DRY RUN] IIS: verificar se W3SVC existe e httpPlatformHandler instalado" -ForegroundColor DarkYellow
 }

@@ -50,7 +50,9 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 
 | Script | Quando usar |
 |--------|-------------|
-| `scripts/deploy-new.ps1` | **Primeira instalação** num servidor novo (BD + backend + frontend) |
+| `scripts/install-prerequisites.ps1` | **Primeiro passo** num servidor novo — instala Git, Python, Node.js, PostgreSQL, IIS e guia o httpPlatformHandler |
+| `scripts/deploy-new.ps1` | **Segunda etapa** — instala a aplicação (assume pré-requisitos já instalados) |
+| `scripts/teardown-vm.ps1` | Limpar completamente uma instalação (para testes ou reinstalação) |
 | `scripts/deploy-update.ps1` | Actualizar a aplicação (sanity check + git pull + build + reiniciar) |
 | `scripts/sanity-check.ps1` | Validar o ambiente **antes** de fazer deploy (ou para diagnóstico) |
 | `scripts/rollback-app.ps1` | Reverter código para versão anterior |
@@ -58,7 +60,11 @@ Os scripts PowerShell referenciados neste guia estão na pasta `scripts/` do rep
 | `scripts/backup-db.ps1` | Backup manual ou agendar backup diário |
 | `scripts/health-check.ps1` | Verificar saúde dos serviços (ou agendar verificação automática) |
 
-> ⚠️ **Antes de executar `deploy-new.ps1`** num servidor novo, é obrigatório instalar manualmente os pré-requisitos listados na [secção 3.2](#32-software-a-instalar-no-servidor): Python 3.11+, Node.js 20 LTS, PostgreSQL 16, Git e os módulos IIS. O script verifica se estão presentes e aborta se algum faltar.
+> ⚠️ **Sequência obrigatória num servidor novo:**
+> 1. `install-prerequisites.ps1` — instala IIS, httpPlatformHandler, Python, Node.js, PostgreSQL
+> 2. `deploy-new.ps1` — instala a aplicação
+>
+> O `deploy-new.ps1` verifica IIS e httpPlatformHandler na Fase 0 e **aborta** se não estiverem instalados, com instruções de como instalar.
 >
 > Também é necessário ter o ficheiro de dump da base de dados (`carta_social_data_db.sql`) — sem ele, o sistema instala mas **não é utilizável** (dropdowns vazios, login impossível). Ver [secção 3.1](#31-acesso-e-credenciais-necessárias).
 
@@ -174,38 +180,38 @@ Ou, mais simples, activar a **partilha de pasta** na VM:
 
 **Passo 4 — Instalar os pré-requisitos na VM:**
 
-Na VM, abre o **PowerShell como Administrador** e corre:
+Na VM, abre o **PowerShell como Administrador** e usa o script automático:
 
 ```powershell
-# Git, Python, Node.js, PostgreSQL via winget
-# (usa sempre --source winget para evitar erro de certificado do Microsoft Store)
-winget install --id Git.Git              -e --silent --source winget
-winget install --id Python.Python.3.11   -e --silent --source winget
-winget install --id OpenJS.NodeJS.LTS    -e --silent --source winget
-winget install --id PostgreSQL.PostgreSQL.16 -e --source winget `
-    --override "--mode unattended --superpassword Postgres2026! --servicename postgresql-16"
+# Clonar o repositório para ter acesso ao script
+git clone https://github.com/EriclesBarbosa/Carta-Social-App.git C:\cs-deploy-tmp
 
-# Activar IIS
-Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer, IIS-ManagementConsole -All
+# Instalar todos os pré-requisitos (Git, Python, Node.js, PostgreSQL, IIS)
+C:\cs-deploy-tmp\scripts\install-prerequisites.ps1
+```
 
-# Fechar e reabrir o PowerShell para actualizar o PATH, depois verificar:
+O script instala tudo via `winget` e mostra instruções para o `httpPlatformHandler` (único item que requer download manual). Após o script terminar:
+
+1. Instalar o **httpPlatformHandler** seguindo as instruções que aparecem no ecrã
+2. Fechar e reabrir o PowerShell como Administrador
+3. Verificar:
+
+```powershell
 git --version      # git version 2.x.x
 python --version   # Python 3.11.x
 node --version     # v20.x.x
 psql --version     # psql (PostgreSQL) 16.x
+Get-Service W3SVC  # Status: Running
 ```
 
 **Passo 5 — Correr o deploy:**
 
 ```powershell
-# Na VM — copiar a pasta scripts/ do repositório para C:\deploy\
-# (ou clonar o repositório directamente)
-
 # DryRun primeiro para confirmar que os pré-requisitos estão correctos
-.\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql" -DryRun
+C:\cs-deploy-tmp\scripts\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql" -DryRun
 
 # Se tudo OK, instalação real
-.\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql"
+C:\cs-deploy-tmp\scripts\deploy-new.ps1 -DbPassword "TestPass123!" -DumpPath "\\tsclient\C\dumps\carta_social_data_db.sql"
 ```
 
 **Passo 6 — Verificar o resultado:**
