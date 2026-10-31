@@ -144,31 +144,31 @@ if (-not $SoBackend) {
     New-Item "$standalone\logs" -ItemType Directory -Force | Out-Null
 
     # Recriar web.config (apagado pelo build)
-    $webConfig = @"
-<?xml version="1.0" encoding="UTF-8"?>
-<configuration>
-  <system.webServer>
-    <handlers>
-      <add name="httpPlatformHandler" path="*" verb="*"
-           modules="httpPlatformHandler" resourceType="Unspecified" />
-    </handlers>
-    <httpPlatform processPath="node.exe"
-                  arguments="server.js"
-                  startupTimeLimit="60"
-                  requestTimeout="00:04:00"
-                  stdoutLogEnabled="true"
-                  stdoutLogFile="logs\nextjs.log">
-      <environmentVariables>
-        <environmentVariable name="PORT"     value="%HTTP_PLATFORM_PORT%" />
-        <environmentVariable name="HOSTNAME" value="127.0.0.1" />
-        <environmentVariable name="NODE_ENV" value="production" />
-        <environmentVariable name="API_URL"  value="$($cfg.ApiUrl)" />
-      </environmentVariables>
-    </httpPlatform>
-  </system.webServer>
-</configuration>
-"@
-    Set-Content "$standalone\web.config" $webConfig -Encoding UTF8
+    $webConfigLines = (
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<configuration>',
+        '  <system.webServer>',
+        '    <handlers>',
+        '      <add name="httpPlatformHandler" path="*" verb="*"',
+        '           modules="httpPlatformHandler" resourceType="Unspecified" />',
+        '    </handlers>',
+        '    <httpPlatform processPath="node.exe"',
+        '                  arguments="server.js"',
+        '                  startupTimeLimit="60"',
+        '                  requestTimeout="00:04:00"',
+        '                  stdoutLogEnabled="true"',
+        '                  stdoutLogFile="logs\nextjs.log">',
+        '      <environmentVariables>',
+        '        <environmentVariable name="PORT"     value="%HTTP_PLATFORM_PORT%" />',
+        '        <environmentVariable name="HOSTNAME" value="127.0.0.1" />',
+        '        <environmentVariable name="NODE_ENV" value="production" />',
+        "        <environmentVariable name=""API_URL""  value=""$($cfg.ApiUrl)"" />",
+        '      </environmentVariables>',
+        '    </httpPlatform>',
+        '  </system.webServer>',
+        '</configuration>'
+    )
+    [System.IO.File]::WriteAllText("$standalone\web.config", ($webConfigLines -join "`r`n"), [System.Text.Encoding]::UTF8)
     Ok "web.config recriado."
 
     # Permissões (apenas standalone, não node_modules inteiro)
