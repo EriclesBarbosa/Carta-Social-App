@@ -889,6 +889,32 @@ if ($DryRun) {
     }
     Log "    Pastas logs criadas (standalone e backend)."
 
+    # Gerar web.config do backend com caminhos absolutos
+    # (o web.config do repo usa caminhos relativos que o httpPlatformHandler nao resolve correctamente)
+    $backendWebConfig = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="httpPlatformHandler" path="*" verb="*"
+           modules="httpPlatformHandler" resourceType="Unspecified" />
+    </handlers>
+    <httpPlatform processPath="$($cfg.Python)"
+                  arguments="-m waitress --listen=127.0.0.1:%HTTP_PLATFORM_PORT% core.wsgi:application"
+                  startupTimeLimit="120"
+                  requestTimeout="00:10:00"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile="$($cfg.BackendDir)\logs\waitress.log">
+      <environmentVariables>
+        <environmentVariable name="PYTHONPATH" value="$($cfg.BackendDir)" />
+      </environmentVariables>
+    </httpPlatform>
+  </system.webServer>
+</configuration>
+"@
+    Set-Content "$($cfg.BackendDir)\web.config" $backendWebConfig -Encoding UTF8
+    Log "    web.config backend gerado com caminhos absolutos ($($cfg.BackendDir)\web.config)."
+
     # Gerar web.config do frontend para IIS httpPlatformHandler (node server.js)
     $frontWebConfig = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1009,6 +1035,16 @@ if ($DryRun) {
         Log "     Site $($cfg.IIS_API)  → porta $($cfg.IIS_API_Port) → $($cfg.BackendDir)"
         Log "     Site $($cfg.IIS_App)  → porta $($cfg.IIS_App_Port) → $($cfg.FrontDir)\.next\standalone"
     } else {
+        # Desbloquear seccoes IIS necessarias para httpPlatformHandler (bloqueadas por omissao)
+        # Sem este passo o IIS retorna 500.19 ao tentar usar o web.config do site
+        Log "    A desbloquear seccoes IIS (handlers/modules)..."
+        $appcmdExe = "$env:SystemRoot\system32\inetsrv\appcmd.exe"
+        $ErrorActionPreference = "Continue"
+        & $appcmdExe unlock config -section:system.webServer/handlers 2>&1 | Out-Null
+        & $appcmdExe unlock config -section:system.webServer/modules  2>&1 | Out-Null
+        $ErrorActionPreference = "Stop"
+        Log "    Seccoes handlers/modules desbloqueadas."
+
         # Application Pools dedicados (evita partilha de processo com Default Web Site)
         foreach ($poolName in @($cfg.IIS_API, $cfg.IIS_App)) {
             if (-not (Test-Path "IIS:\AppPools\$poolName")) {
@@ -1043,6 +1079,9 @@ if ($DryRun) {
         $ErrorActionPreference = "Continue"
         icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)RX" /T 2>&1 | Out-Null
         icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)RX" /T 2>&1 | Out-Null
+        # Permissao de escrita nas pastas logs (httpPlatformHandler precisa de criar ficheiros de log)
+        icacls "$($cfg.BackendDir)\logs" /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)M" 2>&1 | Out-Null
+        icacls "$($cfg.FrontDir)\.next\standalone\logs" /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)M" 2>&1 | Out-Null
         $ErrorActionPreference = "Stop"
         Log "    Permissoes definidas para 'IIS AppPool\$($cfg.IIS_API)' e 'IIS AppPool\$($cfg.IIS_App)'."
     }
