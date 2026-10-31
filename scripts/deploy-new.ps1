@@ -1037,6 +1037,14 @@ if ($DryRun) {
         } else {
             Log "    Site $($cfg.IIS_App) já existe."
         }
+
+        # Permissoes de leitura/execucao para os AppPool identities (ApplicationPoolIdentity)
+        Log "    A definir permissoes IIS AppPool sobre $($cfg.AppRoot)..."
+        $ErrorActionPreference = "Continue"
+        icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_API):(OI)(CI)RX" /T 2>&1 | Out-Null
+        icacls $cfg.AppRoot /grant "IIS AppPool\$($cfg.IIS_App):(OI)(CI)RX" /T 2>&1 | Out-Null
+        $ErrorActionPreference = "Stop"
+        Log "    Permissoes definidas para 'IIS AppPool\$($cfg.IIS_API)' e 'IIS AppPool\$($cfg.IIS_App)'."
     }
 }
 
